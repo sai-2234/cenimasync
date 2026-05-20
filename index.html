@@ -1,0 +1,3402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>CenimaSync — Watch Together</title>
+<meta name="description" content="Watch movies, chat, and play games together in real-time. No downloads needed.">
+<meta name="theme-color" content="#7c3aed">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics-compat.js"></script>
+
+<style>
+/* ============================================================
+   RESET & BASE
+============================================================ */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+:root {
+  --accent: #7c3aed;
+  --accent2: #4f46e5;
+  --accent-glow: rgba(124,58,237,0.35);
+  --cyan: #06b6d4;
+  --pink: #ec4899;
+  --lime: #84cc16;
+  --bg: #080814;
+  --surface: rgba(255,255,255,0.05);
+  --surface2: rgba(255,255,255,0.09);
+  --border: rgba(255,255,255,0.1);
+  --text: #f1f5f9;
+  --text2: rgba(255,255,255,0.55);
+  --text3: rgba(255,255,255,0.3);
+  --radius: 16px;
+  --radius-sm: 10px;
+  --glass: rgba(15,15,30,0.7);
+  --nav-h: 56px;
+  --tab-h: 60px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================================
+   FLUID BACKGROUND
+============================================================ */
+#bg {
+  position: fixed; inset: 0; z-index: 0; overflow: hidden;
+  pointer-events: none;
+}
+.blob {
+  position: absolute; border-radius: 50%;
+  filter: blur(70px); opacity: 0.45;
+  animation: blobFloat linear infinite;
+  will-change: transform;
+}
+.b1 { width:420px;height:420px;background:radial-gradient(#7c3aed,#4f46e5); top:-80px;left:-80px; animation-duration:20s; }
+.b2 { width:350px;height:350px;background:radial-gradient(#ec4899,#8b5cf6); top:35%;right:-60px; animation-duration:25s; animation-delay:-8s; }
+.b3 { width:380px;height:380px;background:radial-gradient(#06b6d4,#3b82f6); bottom:-60px;left:25%; animation-duration:22s; animation-delay:-14s; }
+.b4 { width:280px;height:280px;background:radial-gradient(#10b981,#06b6d4); top:55%;left:5%; animation-duration:28s; animation-delay:-5s; }
+
+@keyframes blobFloat {
+  0%   { transform:translate(0,0) scale(1); }
+  25%  { transform:translate(50px,-70px) scale(1.08); }
+  50%  { transform:translate(-30px,50px) scale(0.94); }
+  75%  { transform:translate(70px,30px) scale(1.04); }
+  100% { transform:translate(0,0) scale(1); }
+}
+
+#bg-overlay {
+  position:fixed;inset:0;z-index:1;
+  background:rgba(8,8,20,0.6);
+  backdrop-filter:blur(1px);
+  pointer-events:none;
+}
+
+/* ============================================================
+   APP SHELL
+============================================================ */
+#app { position:fixed;inset:0;z-index:2;display:flex;flex-direction:column; }
+
+/* ============================================================
+   SCREENS
+============================================================ */
+.screen { display:none;flex-direction:column;flex:1;overflow:hidden; }
+.screen.active { display:flex; }
+
+/* ============================================================
+   HOME SCREEN
+============================================================ */
+#home-screen {
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  padding-bottom: calc(24px + var(--safe-bottom));
+}
+
+.home-scroll { padding:0 16px; }
+
+.home-nav {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 0 8px;
+  position:sticky; top:0; z-index:10;
+}
+
+.logo-text {
+  font-size:22px; font-weight:900; letter-spacing:-0.5px;
+  background:linear-gradient(135deg,#a78bfa,#60a5fa,#34d399);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+
+.nav-icon-btn {
+  width:38px;height:38px;border-radius:50%;
+  border:1px solid var(--border);
+  background:var(--surface);
+  color:var(--text);font-size:16px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:all .2s;backdrop-filter:blur(10px);
+}
+.nav-icon-btn:hover { background:var(--surface2); }
+
+.hero { padding:28px 0 24px; text-align:center; }
+.hero h1 {
+  font-size:clamp(26px,7vw,40px);font-weight:900;line-height:1.1;
+  background:linear-gradient(135deg,#c4b5fd,#60a5fa,#34d399,#f472b6);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  margin-bottom:10px;
+}
+.hero p { font-size:14px;color:var(--text2);line-height:1.6;max-width:300px;margin:0 auto 24px; }
+
+.hero-btns { display:flex;gap:10px;justify-content:center;flex-wrap:wrap; }
+
+.btn-primary {
+  padding:13px 28px;border-radius:50px;border:none;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:white;font-size:14px;font-weight:700;cursor:pointer;
+  transition:all .2s;box-shadow:0 0 20px var(--accent-glow);
+  -webkit-tap-highlight-color:transparent;
+}
+.btn-primary:active { transform:scale(0.96); }
+
+.btn-secondary {
+  padding:13px 28px;border-radius:50px;
+  border:1.5px solid var(--border);
+  background:var(--surface);
+  color:var(--text);font-size:14px;font-weight:700;cursor:pointer;
+  transition:all .2s;backdrop-filter:blur(10px);
+}
+.btn-secondary:active { transform:scale(0.96); }
+
+.section-title {
+  font-size:13px;font-weight:700;color:var(--text3);
+  text-transform:uppercase;letter-spacing:1.5px;
+  margin:24px 0 12px;
+}
+
+.features-grid {
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;
+  margin-bottom:24px;
+}
+
+.feat-card {
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:16px 14px;
+  backdrop-filter:blur(12px);
+  transition:all .2s;
+}
+.feat-card:active { transform:scale(0.97); }
+.feat-icon { font-size:26px;margin-bottom:8px;display:block; }
+.feat-title { font-size:13px;font-weight:700;margin-bottom:3px; }
+.feat-desc { font-size:11px;color:var(--text2);line-height:1.5; }
+
+/* ============================================================
+   JOIN / CREATE MODAL
+============================================================ */
+.modal-overlay {
+  position:fixed;inset:0;z-index:100;
+  background:rgba(0,0,0,0.7);
+  backdrop-filter:blur(10px);
+  display:none;align-items:flex-end;justify-content:center;
+  padding-bottom:var(--safe-bottom);
+}
+.modal-overlay.active { display:flex; }
+
+.modal-sheet {
+  background:linear-gradient(160deg,rgba(20,15,40,0.98),rgba(10,10,25,0.98));
+  border:1px solid var(--border);
+  border-radius:24px 24px 0 0;
+  padding:24px 20px;
+  width:100%;max-width:480px;
+  animation:sheetUp .3s cubic-bezier(0.2,0.8,0.2,1);
+  max-height:90vh;overflow-y:auto;
+}
+
+@keyframes sheetUp {
+  from { transform:translateY(100%); opacity:0; }
+  to   { transform:translateY(0);    opacity:1; }
+}
+
+.sheet-handle {
+  width:40px;height:4px;border-radius:2px;
+  background:var(--border);margin:0 auto 20px;
+}
+
+.sheet-title { font-size:18px;font-weight:800;margin-bottom:6px; }
+.sheet-sub   { font-size:12px;color:var(--text2);margin-bottom:20px; }
+
+.input-group { margin-bottom:14px; }
+.input-label { font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:block; }
+
+.cs-input {
+  width:100%;padding:13px 16px;
+  border-radius:var(--radius-sm);
+  border:1.5px solid var(--border);
+  background:var(--surface);
+  color:var(--text);font-size:15px;
+  outline:none;transition:border-color .2s;
+  -webkit-appearance:none;
+}
+.cs-input:focus { border-color:var(--accent); }
+.cs-input::placeholder { color:var(--text3); }
+
+.cs-input.code-input {
+  text-transform:uppercase;letter-spacing:8px;
+  font-size:22px;font-weight:800;text-align:center;
+}
+
+.btn-full {
+  width:100%;padding:14px;border-radius:var(--radius-sm);
+  border:none;background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:white;font-size:15px;font-weight:700;cursor:pointer;
+  transition:all .2s;margin-top:4px;
+}
+.btn-full:active { transform:scale(0.98); opacity:0.9; }
+.btn-full.secondary {
+  background:var(--surface);border:1.5px solid var(--border);
+  margin-top:8px;
+}
+
+/* ============================================================
+   ROOM SCREEN — MAIN LAYOUT
+============================================================ */
+#room-screen { background:transparent; }
+
+/* Top nav */
+.room-nav {
+  display:flex;align-items:center;gap:10px;
+  padding:10px 14px;
+  background:var(--glass);
+  backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  position:relative;z-index:10;
+  height:var(--nav-h);flex-shrink:0;
+}
+
+.room-code-badge {
+  padding:5px 10px;border-radius:20px;
+  background:var(--surface2);border:1px solid var(--border);
+  font-size:11px;font-weight:800;letter-spacing:2px;color:var(--text);
+  cursor:pointer;
+}
+
+.peers-chip {
+  display:flex;align-items:center;gap:5px;
+  padding:5px 10px;border-radius:20px;
+  background:var(--surface2);border:1px solid var(--border);
+  font-size:11px;font-weight:700;color:var(--text2);
+  cursor:pointer;
+}
+.peers-chip .dot {
+  width:7px;height:7px;border-radius:50%;
+  background:#10b981;
+  animation:pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%,100% { opacity:1;transform:scale(1); }
+  50%      { opacity:0.5;transform:scale(0.7); }
+}
+
+.room-nav-right { margin-left:auto;display:flex;gap:6px;align-items:center; }
+
+.icon-btn {
+  width:34px;height:34px;border-radius:50%;
+  border:1px solid var(--border);background:var(--surface);
+  color:var(--text);font-size:14px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:all .2s;flex-shrink:0;
+}
+.icon-btn:active { transform:scale(0.92); }
+
+/* Tab bar */
+.tab-bar {
+  display:flex;
+  background:var(--glass);
+  backdrop-filter:blur(20px);
+  border-top:1px solid var(--border);
+  height:calc(var(--tab-h) + var(--safe-bottom));
+  padding-bottom:var(--safe-bottom);
+  flex-shrink:0;position:relative;z-index:10;
+}
+
+.tab-btn {
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:3px;
+  cursor:pointer;transition:all .2s;
+  border:none;background:transparent;
+  color:var(--text3);padding:8px 4px;
+  position:relative;
+}
+
+.tab-btn.active { color:var(--accent); }
+.tab-btn.active::before {
+  content:'';position:absolute;top:0;left:25%;right:25%;
+  height:2px;border-radius:0 0 3px 3px;
+  background:var(--accent);
+  box-shadow:0 0 8px var(--accent-glow);
+}
+
+.tab-btn svg { width:20px;height:20px; }
+.tab-btn span { font-size:10px;font-weight:700; }
+
+/* Tab badge */
+.tab-badge {
+  position:absolute;top:6px;right:22%;
+  width:16px;height:16px;border-radius:50%;
+  background:var(--pink);
+  font-size:9px;font-weight:800;color:white;
+  display:flex;align-items:center;justify-content:center;
+}
+
+/* Content panels */
+.room-content { flex:1;overflow:hidden;position:relative; }
+
+.panel {
+  position:absolute;inset:0;display:none;
+  flex-direction:column;overflow:hidden;
+}
+.panel.active { display:flex; }
+
+/* ============================================================
+   WATCH PANEL
+============================================================ */
+.video-wrapper {
+  background:#000;position:relative;
+  flex-shrink:0;
+}
+
+.video-wrapper video {
+  width:100%;display:block;
+  max-height:40vh;object-fit:contain;
+  background:#000;
+}
+
+.video-placeholder {
+  aspect-ratio:16/9;max-height:40vh;width:100%;
+  background:linear-gradient(135deg,rgba(124,58,237,0.1),rgba(6,182,212,0.1));
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:12px;color:var(--text2);
+}
+.video-placeholder span { font-size:40px; }
+.video-placeholder p  { font-size:13px;text-align:center;padding:0 20px; }
+
+.video-controls-bar {
+  display:flex;align-items:center;gap:8px;
+  padding:8px 12px;
+  background:rgba(0,0,0,0.5);
+  backdrop-filter:blur(10px);
+}
+
+.vc-btn {
+  width:36px;height:36px;border-radius:50%;
+  background:var(--surface2);border:1px solid var(--border);
+  color:white;font-size:15px;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:all .2s;flex-shrink:0;
+}
+.vc-btn:active { transform:scale(0.9); }
+
+.progress-bar-wrap {
+  flex:1;height:4px;border-radius:2px;
+  background:rgba(255,255,255,0.15);cursor:pointer;
+  position:relative;
+}
+.progress-bar-fill {
+  height:100%;border-radius:2px;
+  background:linear-gradient(90deg,var(--accent),var(--cyan));
+  width:0%;transition:width .3s linear;
+}
+
+.time-label { font-size:11px;color:var(--text2);white-space:nowrap;flex-shrink:0; }
+
+.sync-badge {
+  padding:2px 8px;border-radius:20px;
+  background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.3);
+  font-size:10px;font-weight:700;color:#10b981;flex-shrink:0;
+}
+
+.url-input-row {
+  display:flex;gap:8px;padding:10px 12px;
+  background:rgba(0,0,0,0.3);border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+
+.url-input-row input {
+  flex:1;padding:9px 12px;border-radius:8px;
+  border:1px solid var(--border);background:var(--surface);
+  color:var(--text);font-size:12px;outline:none;
+  -webkit-appearance:none;
+}
+.url-input-row input:focus { border-color:var(--accent); }
+
+.url-load-btn {
+  padding:9px 14px;border-radius:8px;border:none;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:white;font-size:12px;font-weight:700;cursor:pointer;
+  white-space:nowrap;flex-shrink:0;
+}
+
+.active-game-bar {
+  display:none;
+  align-items:center;gap:10px;padding:10px 14px;
+  background:rgba(124,58,237,0.15);border-bottom:1px solid rgba(124,58,237,0.2);
+  flex-shrink:0;
+}
+.active-game-bar.visible { display:flex; }
+.agb-text { flex:1;font-size:12px;font-weight:600;color:#c4b5fd; }
+.agb-join { padding:6px 14px;border-radius:8px;border:none;font-size:12px;font-weight:700;cursor:pointer;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:white; }
+
+.watch-scroll {
+  flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px;
+  display:flex;flex-direction:column;gap:10px;
+}
+
+.watching-info-card {
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:14px;
+}
+.wic-title { font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px; }
+.peer-row {
+  display:flex;align-items:center;gap:8px;padding:6px 0;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+}
+.peer-row:last-child { border-bottom:none;padding-bottom:0; }
+.peer-avatar {
+  width:32px;height:32px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:700;color:white;flex-shrink:0;
+}
+.peer-name { flex:1;font-size:13px;font-weight:600; }
+.peer-badge {
+  padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;
+  background:rgba(124,58,237,0.25);color:#a78bfa;
+  border:1px solid rgba(124,58,237,0.3);
+}
+.peer-badge.you { background:rgba(16,185,129,0.2);color:#34d399;border-color:rgba(16,185,129,0.3); }
+
+.invite-btn-peer {
+  padding:5px 10px;border-radius:20px;border:1px solid var(--border);
+  background:var(--surface2);color:var(--text2);font-size:10px;font-weight:700;
+  cursor:pointer;transition:all .2s;
+}
+.invite-btn-peer:active { transform:scale(0.94); }
+
+/* ============================================================
+   CHAT PANEL
+============================================================ */
+#chat-panel { background:transparent; }
+
+.chat-messages {
+  flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:12px;display:flex;flex-direction:column;gap:10px;
+}
+.chat-messages::-webkit-scrollbar { display:none; }
+
+.chat-day-label {
+  text-align:center;font-size:10px;color:var(--text3);
+  font-weight:600;padding:4px 12px;
+  background:var(--surface);border-radius:20px;
+  margin:4px auto;width:fit-content;
+}
+
+.msg { display:flex;gap:8px;max-width:85%; }
+.msg.me { align-self:flex-end;flex-direction:row-reverse; }
+.msg.them { align-self:flex-start; }
+
+.msg-ava {
+  width:28px;height:28px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:800;color:white;
+  flex-shrink:0;align-self:flex-end;
+}
+.msg-body { display:flex;flex-direction:column;gap:2px; }
+.msg-name { font-size:10px;font-weight:700;color:var(--text2);padding:0 4px; }
+.msg.me .msg-name { text-align:right; }
+
+.msg-bubble {
+  padding:9px 13px;border-radius:16px;
+  font-size:13px;line-height:1.5;word-break:break-word;
+}
+.msg.me .msg-bubble {
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:white;border-bottom-right-radius:4px;
+}
+.msg.them .msg-bubble {
+  background:var(--surface2);border:1px solid var(--border);
+  color:var(--text);border-bottom-left-radius:4px;
+}
+
+.msg-time { font-size:9px;color:var(--text3);padding:0 4px; }
+.msg.me .msg-time { text-align:right; }
+
+.emoji-reaction {
+  display:flex;gap:4px;flex-wrap:wrap;margin-top:3px;padding:0 4px;
+}
+.emoji-btn-row {
+  display:flex;gap:4px;padding:6px 12px;overflow-x:auto;
+  border-bottom:1px solid var(--border);flex-shrink:0;
+  -webkit-overflow-scrolling:touch;
+}
+.emoji-btn-row::-webkit-scrollbar { display:none; }
+.emoji-pill {
+  padding:6px 10px;border-radius:20px;border:1px solid var(--border);
+  background:var(--surface);font-size:16px;cursor:pointer;
+  flex-shrink:0;transition:all .15s;
+}
+.emoji-pill:active { transform:scale(1.2); }
+
+.chat-input-row {
+  display:flex;gap:8px;padding:10px 12px;
+  background:var(--glass);
+  backdrop-filter:blur(20px);
+  border-top:1px solid var(--border);
+  flex-shrink:0;
+}
+
+.chat-input {
+  flex:1;padding:11px 14px;border-radius:22px;
+  border:1.5px solid var(--border);background:var(--surface);
+  color:var(--text);font-size:14px;outline:none;
+  -webkit-appearance:none;
+  transition:border-color .2s;
+}
+.chat-input:focus { border-color:var(--accent); }
+.chat-input::placeholder { color:var(--text3); }
+
+.send-btn {
+  width:42px;height:42px;border-radius:50%;border:none;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:white;font-size:18px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;transition:all .2s;
+  box-shadow:0 0 12px var(--accent-glow);
+}
+.send-btn:active { transform:scale(0.92); }
+
+/* ============================================================
+   GAMES PANEL
+============================================================ */
+#games-panel { background:transparent; }
+
+.games-scroll {
+  flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:12px;
+}
+.games-scroll::-webkit-scrollbar { display:none; }
+
+.games-cat-title {
+  font-size:12px;font-weight:700;color:var(--text3);
+  text-transform:uppercase;letter-spacing:1.5px;
+  margin:16px 0 8px;
+}
+.games-cat-title:first-child { margin-top:0; }
+
+.games-grid { display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px; }
+
+.game-card {
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:14px 12px;
+  cursor:pointer;transition:all .2s;
+  display:flex;flex-direction:column;align-items:center;
+  text-align:center;gap:6px;
+  -webkit-tap-highlight-color:transparent;
+}
+.game-card:active { transform:scale(0.95);background:var(--surface2); }
+.game-card .gc-icon { font-size:30px; }
+.game-card .gc-name { font-size:12px;font-weight:700; }
+.game-card .gc-players { font-size:10px;color:var(--text3); }
+
+/* ============================================================
+   GAME ACTIVE SCREEN
+============================================================ */
+#game-screen {
+  position:fixed;inset:0;z-index:50;
+  background:var(--bg);
+  flex-direction:column;
+  display:none;
+}
+#game-screen.open { display:flex; }
+
+.game-top-bar {
+  display:flex;align-items:center;gap:10px;
+  padding:10px 14px;
+  background:var(--glass);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  height:var(--nav-h);flex-shrink:0;
+}
+
+.game-title-text {
+  font-size:16px;font-weight:800;flex:1;
+  background:linear-gradient(135deg,#a78bfa,#60a5fa);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+
+.game-invite-btn {
+  display:flex;align-items:center;gap:5px;
+  padding:7px 12px;border-radius:20px;
+  background:rgba(124,58,237,0.25);border:1px solid rgba(124,58,237,0.4);
+  color:#a78bfa;font-size:11px;font-weight:700;cursor:pointer;
+  transition:all .2s;
+}
+.game-invite-btn:active { transform:scale(0.94); }
+
+.game-status-bar {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 14px;
+  background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+
+.turn-chip {
+  display:flex;align-items:center;gap:6px;
+  font-size:12px;font-weight:700;
+}
+.turn-dot {
+  width:8px;height:8px;border-radius:50%;background:var(--accent);
+  animation:pulse 1.5s infinite;
+}
+
+.score-row { display:flex;gap:12px;align-items:center; }
+.score-chip {
+  padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;
+  background:var(--surface2);border:1px solid var(--border);
+}
+
+.game-body { flex:1;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px; }
+
+.game-exit-btn {
+  padding:7px 14px;border-radius:20px;
+  background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);
+  color:#f87171;font-size:11px;font-weight:700;cursor:pointer;
+}
+
+/* ============================================================
+   TTT GAME
+============================================================ */
+.ttt-wrap { width:100%;max-width:280px;margin:0 auto; }
+.ttt-grid {
+  display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+}
+.ttt-cell {
+  aspect-ratio:1;background:var(--surface);
+  border:2px solid var(--border);border-radius:12px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:36px;font-weight:900;cursor:pointer;
+  transition:all .2s;user-select:none;
+  -webkit-tap-highlight-color:transparent;
+}
+.ttt-cell:active:not(.filled):not(.disabled) { transform:scale(0.94); }
+.ttt-cell.x { color:#a78bfa; }
+.ttt-cell.o { color:#60a5fa; }
+.ttt-cell.win { background:rgba(124,58,237,0.25);border-color:var(--accent);animation:winPulse .5s ease; }
+.ttt-cell.disabled { cursor:not-allowed;opacity:0.7; }
+@keyframes winPulse { 0%{transform:scale(1)}50%{transform:scale(1.07)}100%{transform:scale(1)} }
+
+/* ============================================================
+   CONNECT FOUR
+============================================================ */
+.c4-wrap { width:100%;max-width:320px;margin:0 auto; }
+.c4-col-btns { display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:6px; }
+.c4-col-btn {
+  padding:5px 2px;border-radius:6px;border:1px solid var(--border);
+  background:var(--surface);color:var(--text2);font-size:10px;
+  cursor:pointer;text-align:center;transition:all .2s;
+}
+.c4-col-btn:active:not(:disabled) { background:rgba(124,58,237,0.3);color:white; }
+.c4-col-btn:disabled { opacity:0.3;cursor:not-allowed; }
+.c4-board {
+  display:grid;grid-template-columns:repeat(7,1fr);gap:5px;
+  background:rgba(37,99,235,0.2);border-radius:14px;padding:10px;
+  border:2px solid rgba(37,99,235,0.25);
+}
+.c4-cell {
+  aspect-ratio:1;border-radius:50%;
+  background:rgba(255,255,255,0.07);border:1.5px solid rgba(255,255,255,0.08);
+  transition:all .2s;
+}
+.c4-cell.p1 { background:#ef4444;border-color:#dc2626;box-shadow:0 0 6px rgba(239,68,68,0.5); }
+.c4-cell.p2 { background:#f59e0b;border-color:#d97706;box-shadow:0 0 6px rgba(245,158,11,0.5); }
+.c4-cell.win { animation:winPulse .5s infinite alternate; }
+
+/* ============================================================
+   CHESS
+============================================================ */
+.chess-wrap { width:100%;max-width:320px;margin:0 auto; }
+.chess-board {
+  display:grid;grid-template-columns:repeat(8,1fr);
+  border:2px solid rgba(255,255,255,0.15);border-radius:8px;overflow:hidden;
+}
+.ch-cell {
+  aspect-ratio:1;display:flex;align-items:center;justify-content:center;
+  font-size:clamp(14px,4vw,22px);cursor:pointer;transition:all .15s;
+  user-select:none;position:relative;
+}
+.ch-cell.light { background:rgba(240,217,181,0.25); }
+.ch-cell.dark  { background:rgba(181,136,99,0.25); }
+.ch-cell.selected { background:rgba(124,58,237,0.45)!important; }
+.ch-cell.valid-move::after {
+  content:'';position:absolute;width:32%;height:32%;
+  background:rgba(124,58,237,0.7);border-radius:50%;
+}
+.ch-cell.disabled { cursor:not-allowed; }
+
+/* ============================================================
+   SNAKE & LADDER
+============================================================ */
+.sl-wrap { width:100%;max-width:320px;margin:0 auto; }
+.sl-board {
+  display:grid;grid-template-columns:repeat(10,1fr);gap:1px;
+  background:rgba(0,0,0,0.2);border:1.5px solid var(--border);
+  border-radius:10px;overflow:hidden;
+}
+.sl-cell {
+  aspect-ratio:1;display:flex;align-items:center;justify-content:center;
+  font-size:6px;font-weight:700;color:var(--text3);
+  background:rgba(255,255,255,0.03);position:relative;
+  border:0.5px solid rgba(255,255,255,0.04);
+}
+.sl-cell.snake { background:rgba(239,68,68,0.15);color:#f87171; }
+.sl-cell.ladder { background:rgba(16,185,129,0.15);color:#34d399; }
+.sl-token {
+  position:absolute;width:60%;height:60%;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:7px;font-weight:700;color:white;
+  border:1px solid rgba(0,0,0,0.3);
+}
+
+/* ============================================================
+   LUDO SIMPLIFIED
+============================================================ */
+.ludo-wrap { width:100%;max-width:300px;margin:0 auto; }
+.ludo-area {
+  display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;
+}
+.ludo-zone {
+  aspect-ratio:1;border-radius:12px;padding:8px;
+  display:grid;grid-template-columns:1fr 1fr;gap:4px;
+  align-content:center;justify-items:center;
+}
+.ludo-zone.red    { background:rgba(239,68,68,0.2);border:1.5px solid rgba(239,68,68,0.3); }
+.ludo-zone.blue   { background:rgba(59,130,246,0.2);border:1.5px solid rgba(59,130,246,0.3); }
+.ludo-zone.green  { background:rgba(16,185,129,0.2);border:1.5px solid rgba(16,185,129,0.3); }
+.ludo-zone.yellow { background:rgba(245,158,11,0.2);border:1.5px solid rgba(245,158,11,0.3); }
+
+.ludo-token-slot {
+  width:32px;height:32px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:800;color:white;border:2px solid rgba(255,255,255,0.3);
+  cursor:pointer;transition:all .2s;
+}
+.ludo-token-slot.red-t    { background:#ef4444; }
+.ludo-token-slot.blue-t   { background:#3b82f6; }
+.ludo-token-slot.green-t  { background:#10b981; }
+.ludo-token-slot.yellow-t { background:#f59e0b; }
+.ludo-token-slot.out { opacity:0.25;cursor:default; }
+.ludo-token-slot:active:not(.out) { transform:scale(1.1); }
+
+/* ============================================================
+   DICE & CONTROLS
+============================================================ */
+.dice-row {
+  display:flex;align-items:center;justify-content:center;gap:16px;
+  padding:12px;
+}
+.dice-face {
+  width:52px;height:52px;border-radius:10px;
+  background:var(--surface2);border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-size:28px;font-weight:900;
+}
+.roll-btn {
+  padding:12px 28px;border-radius:50px;border:none;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:white;font-size:14px;font-weight:700;cursor:pointer;
+  transition:all .2s;box-shadow:0 0 16px var(--accent-glow);
+}
+.roll-btn:disabled { opacity:0.4;cursor:not-allowed;box-shadow:none; }
+.roll-btn:active:not(:disabled) { transform:scale(0.95); }
+
+/* ============================================================
+   RPS GAME
+============================================================ */
+.rps-choices { display:flex;gap:12px;justify-content:center;margin:20px 0; }
+.rps-btn {
+  width:80px;height:80px;border-radius:50%;
+  background:var(--surface2);border:2px solid var(--border);
+  font-size:36px;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:all .2s;
+}
+.rps-btn:active { transform:scale(0.9);background:rgba(124,58,237,0.3); }
+.rps-result { text-align:center;font-size:18px;font-weight:800;margin:12px 0; }
+
+/* ============================================================
+   NUMBER GUESS
+============================================================ */
+.ng-wrap { text-align:center;padding:12px; }
+.ng-hint { font-size:28px;font-weight:900;margin:16px 0;color:#a78bfa; }
+.ng-input {
+  width:100%;max-width:200px;padding:12px;border-radius:12px;
+  border:1.5px solid var(--border);background:var(--surface);
+  color:white;font-size:22px;text-align:center;outline:none;
+  margin:0 auto 12px;display:block;-webkit-appearance:none;
+}
+.ng-input:focus { border-color:var(--accent); }
+
+/* ============================================================
+   MEMORY MATCH
+============================================================ */
+.mem-grid {
+  display:grid;grid-template-columns:repeat(4,1fr);gap:6px;
+  max-width:280px;margin:0 auto;
+}
+.mem-card {
+  aspect-ratio:1;border-radius:10px;font-size:24px;
+  background:var(--surface);border:1.5px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:all .3s;transform-style:preserve-3d;
+  user-select:none;
+}
+.mem-card.flip { background:var(--surface2);border-color:var(--accent); }
+.mem-card.matched { background:rgba(16,185,129,0.2);border-color:#10b981;cursor:default; }
+.mem-card.disabled { cursor:not-allowed;opacity:0.7; }
+
+/* ============================================================
+   TRUTH OR DARE / WOULD YOU RATHER
+============================================================ */
+.card-game-wrap { text-align:center;padding:16px; }
+.question-card {
+  background:var(--surface);border:1px solid var(--border);border-radius:20px;
+  padding:24px 20px;margin:16px 0;min-height:120px;
+  display:flex;align-items:center;justify-content:center;
+}
+.question-text { font-size:16px;font-weight:600;line-height:1.6; }
+.card-btns { display:flex;gap:10px;justify-content:center;flex-wrap:wrap; }
+.card-btn {
+  padding:10px 24px;border-radius:50px;border:1.5px solid var(--border);
+  background:var(--surface2);color:white;font-size:13px;font-weight:700;
+  cursor:pointer;transition:all .2s;
+}
+.card-btn.primary { background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent; }
+.card-btn:active { transform:scale(0.95); }
+
+/* ============================================================
+   TOAST
+============================================================ */
+#toast {
+  position:fixed;bottom:80px;left:50%;
+  transform:translateX(-50%) translateY(20px);
+  background:rgba(20,20,40,0.95);
+  border:1px solid rgba(124,58,237,0.4);
+  border-radius:50px;padding:10px 20px;
+  font-size:13px;font-weight:600;color:white;
+  z-index:9999;backdrop-filter:blur(20px);
+  opacity:0;transition:all .3s;pointer-events:none;
+  white-space:nowrap;max-width:90vw;
+  box-shadow:0 0 20px rgba(0,0,0,0.5);
+}
+#toast.show { opacity:1;transform:translateX(-50%) translateY(0); }
+
+/* ============================================================
+   POPUP MODALS (invite, game notification)
+============================================================ */
+.popup-modal {
+  position:fixed;inset:0;z-index:200;
+  background:rgba(0,0,0,0.75);backdrop-filter:blur(10px);
+  display:none;align-items:center;justify-content:center;padding:20px;
+}
+.popup-modal.open { display:flex; }
+
+.popup-card {
+  background:linear-gradient(160deg,rgba(20,15,45,0.98),rgba(10,10,25,0.98));
+  border:1px solid var(--border);border-radius:24px;padding:28px 22px;
+  max-width:360px;width:100%;text-align:center;
+  animation:popIn .3s cubic-bezier(0.2,0.8,0.2,1);
+}
+@keyframes popIn {
+  from { transform:scale(0.85);opacity:0; }
+  to   { transform:scale(1);opacity:1; }
+}
+
+.popup-icon { font-size:52px;margin-bottom:12px;display:block; }
+.popup-title { font-size:20px;font-weight:800;margin-bottom:6px; }
+.popup-sub  { font-size:13px;color:var(--text2);margin-bottom:22px;line-height:1.5; }
+.popup-btns { display:flex;gap:10px;justify-content:center; }
+.popup-btn  {
+  flex:1;padding:12px;border-radius:12px;font-size:14px;font-weight:700;
+  cursor:pointer;border:none;transition:all .2s;max-width:130px;
+}
+.popup-btn.yes { background:linear-gradient(135deg,var(--accent),var(--accent2));color:white; }
+.popup-btn.no  { background:var(--surface2);border:1px solid var(--border);color:var(--text); }
+.popup-btn:active { transform:scale(0.95); }
+
+/* ============================================================
+   SETTINGS PANEL
+============================================================ */
+.settings-panel {
+  position:fixed;inset:0;z-index:150;
+  background:rgba(0,0,0,0.7);backdrop-filter:blur(10px);
+  display:none;align-items:flex-end;justify-content:center;
+}
+.settings-panel.open { display:flex; }
+.settings-sheet {
+  background:linear-gradient(160deg,rgba(20,15,40,0.98),rgba(10,10,25,0.98));
+  border:1px solid var(--border);border-radius:24px 24px 0 0;
+  padding:20px;width:100%;max-width:480px;
+  max-height:80vh;overflow-y:auto;
+  animation:sheetUp .3s cubic-bezier(0.2,0.8,0.2,1);
+  padding-bottom:calc(16px + var(--safe-bottom));
+}
+
+.setting-row {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 0;border-bottom:1px solid rgba(255,255,255,0.05);
+}
+.setting-row:last-child { border-bottom:none; }
+.setting-label { font-size:14px;font-weight:600; }
+.setting-sub   { font-size:11px;color:var(--text2);margin-top:2px; }
+
+.toggle {
+  width:44px;height:26px;border-radius:13px;
+  background:rgba(255,255,255,0.1);border:1px solid var(--border);
+  position:relative;cursor:pointer;transition:background .25s;flex-shrink:0;
+}
+.toggle.on { background:var(--accent);border-color:var(--accent); }
+.toggle::after {
+  content:'';position:absolute;top:2px;left:2px;
+  width:20px;height:20px;border-radius:50%;
+  background:white;transition:transform .25s;
+}
+.toggle.on::after { transform:translateX(18px); }
+
+.color-swatches { display:flex;gap:8px; }
+.swatch {
+  width:26px;height:26px;border-radius:50%;cursor:pointer;
+  border:2px solid transparent;transition:all .2s;
+}
+.swatch.active { border-color:white;transform:scale(1.15); }
+
+/* ============================================================
+   PEERS POPUP
+============================================================ */
+.peers-popup {
+  position:fixed;top:calc(var(--nav-h) + 8px);left:50%;
+  transform:translateX(-50%);z-index:80;
+  background:linear-gradient(160deg,rgba(20,15,40,0.98),rgba(10,10,25,0.98));
+  border:1px solid var(--border);border-radius:16px;
+  padding:16px;min-width:240px;max-width:90vw;
+  display:none;animation:fadeDown .2s ease;
+  box-shadow:0 20px 60px rgba(0,0,0,0.6);
+}
+.peers-popup.open { display:block; }
+@keyframes fadeDown {
+  from { opacity:0;transform:translateX(-50%) translateY(-8px); }
+  to   { opacity:1;transform:translateX(-50%) translateY(0); }
+}
+
+/* ============================================================
+   INVITE LINK SHEET
+============================================================ */
+.invite-sheet-input {
+  width:100%;padding:11px 14px;border-radius:10px;
+  border:1.5px solid var(--border);background:var(--surface);
+  color:var(--text);font-size:12px;outline:none;margin-bottom:10px;
+  -webkit-appearance:none;
+}
+.share-row { display:flex;gap:8px;flex-wrap:wrap; }
+.share-btn {
+  flex:1;min-width:100px;padding:10px;border-radius:10px;
+  border:1px solid var(--border);background:var(--surface);
+  color:var(--text);font-size:12px;font-weight:600;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:5px;
+  transition:all .2s;
+}
+.share-btn:active { transform:scale(0.95); }
+
+/* ============================================================
+   ABOUT PAGE
+============================================================ */
+#about-screen {
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding-bottom:calc(24px + var(--safe-bottom));
+}
+.about-nav {
+  display:flex;align-items:center;gap:12px;
+  padding:14px 16px;
+  background:var(--glass);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:10;
+}
+.about-content { padding:20px 16px; }
+
+.about-hero {
+  text-align:center;padding:24px 0 32px;
+}
+.about-hero .big-logo {
+  font-size:56px;margin-bottom:12px;display:block;
+  animation:float 3s ease-in-out infinite;
+}
+@keyframes float {
+  0%,100% { transform:translateY(0); }
+  50%      { transform:translateY(-8px); }
+}
+.about-hero h1 {
+  font-size:28px;font-weight:900;
+  background:linear-gradient(135deg,#c4b5fd,#60a5fa,#34d399,#f472b6);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  margin-bottom:8px;
+}
+.about-hero p { font-size:13px;color:var(--text2);line-height:1.7;max-width:320px;margin:0 auto; }
+
+.about-section { margin-bottom:28px; }
+.about-section h2 {
+  font-size:16px;font-weight:800;margin-bottom:12px;
+  display:flex;align-items:center;gap:8px;
+}
+
+.about-card {
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:16px;margin-bottom:8px;
+  backdrop-filter:blur(10px);
+}
+.about-card h3 { font-size:13px;font-weight:700;margin-bottom:4px; }
+.about-card p  { font-size:12px;color:var(--text2);line-height:1.6; }
+
+.step-list { display:flex;flex-direction:column;gap:8px; }
+.step-item {
+  display:flex;align-items:flex-start;gap:12px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;padding:12px;
+}
+.step-num {
+  width:28px;height:28px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:800;color:white;
+}
+.step-text { font-size:12px;color:var(--text2);line-height:1.6; }
+.step-text strong { color:var(--text); }
+
+.legal-box {
+  background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.2);
+  border-radius:var(--radius);padding:18px;
+}
+.legal-box h3 { font-size:14px;font-weight:800;margin-bottom:12px;color:#a78bfa; }
+.legal-box p  { font-size:11px;color:var(--text2);line-height:1.8;margin-bottom:8px; }
+.legal-box p:last-child { margin-bottom:0; }
+
+.credit-card {
+  background:linear-gradient(135deg,rgba(124,58,237,0.15),rgba(6,182,212,0.1));
+  border:1px solid rgba(124,58,237,0.25);border-radius:var(--radius);
+  padding:20px;text-align:center;
+}
+.credit-card .credit-name {
+  font-size:20px;font-weight:900;
+  background:linear-gradient(135deg,#a78bfa,#60a5fa);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  margin-bottom:4px;
+}
+.credit-card .credit-year { font-size:12px;color:var(--text2); }
+.credit-card .credit-heart { font-size:24px;margin-bottom:8px;display:block; }
+
+/* ============================================================
+   UTILITY
+============================================================ */
+.divider {
+  height:1px;background:var(--border);margin:4px 0;
+}
+.text-center { text-align:center; }
+.mt8  { margin-top:8px; }
+.mt12 { margin-top:12px; }
+.mt16 { margin-top:16px; }
+.hidden { display:none!important; }
+.fade-in { animation:fadeIn .3s ease; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+/* scrollbar */
+*::-webkit-scrollbar { width:3px;height:3px; }
+*::-webkit-scrollbar-track { background:transparent; }
+*::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.15);border-radius:2px; }
+
+/* loading spinner */
+.spinner {
+  width:32px;height:32px;border-radius:50%;
+  border:3px solid rgba(255,255,255,0.1);
+  border-top-color:var(--accent);
+  animation:spin .8s linear infinite;margin:0 auto;
+}
+@keyframes spin { to{transform:rotate(360deg)} }
+</style>
+</head>
+<body>
+
+<!-- Animated Background -->
+<div id="bg">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+  <div class="blob b3"></div>
+  <div class="blob b4"></div>
+</div>
+<div id="bg-overlay"></div>
+
+<!-- App Shell -->
+<div id="app">
+
+<!-- ============================================================
+     HOME SCREEN
+============================================================ -->
+<div class="screen active" id="home-screen">
+  <div class="home-scroll">
+    <div class="home-nav">
+      <div class="logo-text">🎬 CenimaSync</div>
+      <div style="display:flex;gap:8px">
+        <button class="nav-icon-btn" onclick="showAbout()">ℹ️</button>
+        <button class="nav-icon-btn" onclick="openSettings()">⚙️</button>
+      </div>
+    </div>
+
+    <div class="hero">
+      <h1>Watch Together,<br>Anywhere 🌍</h1>
+      <p>Sync movies, chat in real-time, and play 22+ games with friends — no downloads, no signups.</p>
+      <div class="hero-btns">
+        <button class="btn-primary" onclick="openCreateRoom()">🎬 Create Room</button>
+        <button class="btn-secondary" onclick="openJoinRoom()">🔑 Join Room</button>
+      </div>
+    </div>
+
+    <div class="section-title">What You Can Do</div>
+    <div class="features-grid">
+      <div class="feat-card">
+        <span class="feat-icon">🔄</span>
+        <div class="feat-title">Perfect Sync</div>
+        <div class="feat-desc">Every pause, play & seek syncs instantly across all devices</div>
+      </div>
+      <div class="feat-card">
+        <span class="feat-icon">💬</span>
+        <div class="feat-title">Live Chat</div>
+        <div class="feat-desc">React, message, and share moments in real-time</div>
+      </div>
+      <div class="feat-card">
+        <span class="feat-icon">🎮</span>
+        <div class="feat-title">22+ Games</div>
+        <div class="feat-desc">Board, arcade, party & word games — all multiplayer</div>
+      </div>
+      <div class="feat-card">
+        <span class="feat-icon">📱</span>
+        <div class="feat-title">Mobile First</div>
+        <div class="feat-desc">Designed for your phone. Works on any device.</div>
+      </div>
+    </div>
+
+    <div class="section-title">How It Works</div>
+    <div class="step-list">
+      <div class="step-item">
+        <div class="step-num">1</div>
+        <div class="step-text"><strong>Create a Room</strong> — Get a unique 5-letter code instantly</div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">2</div>
+        <div class="step-text"><strong>Share the Code</strong> — Friends join from any device</div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">3</div>
+        <div class="step-text"><strong>Paste a Video URL</strong> — Load any .mp4 or .webm link</div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">4</div>
+        <div class="step-text"><strong>Press Play</strong> — Syncs perfectly for everyone 🎉</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     ABOUT SCREEN
+============================================================ -->
+<div class="screen" id="about-screen">
+  <div class="about-nav">
+    <button class="icon-btn" onclick="showScreen('home-screen')">←</button>
+    <span style="font-weight:800;font-size:16px">About CenimaSync</span>
+  </div>
+  <div class="about-content">
+
+    <div class="about-hero">
+      <span class="big-logo">🎬</span>
+      <h1>CenimaSync</h1>
+      <p>The ultimate real-time watch-together platform. Watch movies, chat, and play 22+ multiplayer games — all in one place, perfectly synced.</p>
+    </div>
+
+    <div class="about-section">
+      <h2>🌟 What is CenimaSync?</h2>
+      <div class="about-card">
+        <p>CenimaSync is a real-time watch-together platform that lets friends watch movies, chat, and play multiplayer games together — no matter the distance. Built in 2026 by <strong style="color:white">Sai Chatre</strong>, it eliminates the "3… 2… 1… play!" countdown problem by syncing every pause, play, and rewind across all devices instantly via Firebase Firestore. Whether you're miles apart or just in different rooms, CenimaSync makes you feel like you're right there together.</p>
+      </div>
+    </div>
+
+    <div class="about-section">
+      <h2>✨ Core Features</h2>
+      <div class="about-card">
+        <h3>🎬 Sync-Watch Rooms</h3>
+        <p>Create a room, get a 5-letter code, and share it with anyone. Load any .mp4 or .webm video URL and press play — everyone sees the same frame at the same millisecond. No drift, no lag, no manual counting.</p>
+      </div>
+      <div class="about-card">
+        <h3>💬 Real-Time Chat</h3>
+        <p>Instant messaging synced across all devices via Firestore. Themed bubbles, quick emoji reactions (❤️ 😂 🔥 😮 👏 🥹), timestamps, and customizable font sizes. Your conversations feel alive.</p>
+      </div>
+      <div class="about-card">
+        <h3>🎮 22+ Multiplayer Games</h3>
+        <p>Board, arcade, party, word, and couples games — all synced in real-time. Invite friends directly from inside any game. Turn-based controls ensure only the right player can move on their turn.</p>
+      </div>
+      <div class="about-card">
+        <h3>🔗 Smart Invite System</h3>
+        <p>When you start a game, everyone in the room sees a notification chip. Tap Invite next to any friend's name — they get a big popup to accept or decline instantly.</p>
+      </div>
+    </div>
+
+    <div class="about-section">
+      <h2>🎮 Games Available</h2>
+      <div class="about-card">
+        <h3>Board Games (8)</h3>
+        <p>Tic Tac Toe, Connect 4, Chess, Checkers, Dots & Boxes, Battleship, Memory Match, Rock Paper Scissors</p>
+      </div>
+      <div class="about-card">
+        <h3>Party Games (6)</h3>
+        <p>Truth or Dare, Would You Rather, Quiz Duel, Number Guess, Dice Battle, 20 Questions</p>
+      </div>
+      <div class="about-card">
+        <h3>Word Games (2)</h3>
+        <p>Hangman, Word Chain</p>
+      </div>
+      <div class="about-card">
+        <h3>Arcade & Special (6+)</h3>
+        <p>Snake Duel, Car Racing, Simon Says, Reaction Race, Couple Compatibility Quiz, and more added regularly.</p>
+      </div>
+    </div>
+
+    <div class="about-section">
+      <h2>🎨 Customization</h2>
+      <div class="about-card">
+        <p>Tap the ⚙️ gear icon to access: <strong style="color:white">Theme</strong> (Dark/Light), <strong style="color:white">Accent Color</strong> (Violet, Cyan, Pink, Lime), <strong style="color:white">Chat Bubble Style</strong>, <strong style="color:white">Font Size</strong>, <strong style="color:white">Compact Mode</strong>, <strong style="color:white">Reduce Motion</strong>, <strong style="color:white">Sound Effects</strong>, and <strong style="color:white">Notifications</strong>. All settings persist across sessions.</p>
+      </div>
+    </div>
+
+    <div class="about-section">
+      <h2>⚙️ Technical Architecture</h2>
+      <div class="about-card">
+        <h3>🔥 Firebase Firestore</h3>
+        <p>Real-time database powering all sync. Rooms, peers, chat, games, and invites all live as Firestore subcollections with onSnapshot subscriptions for instant updates.</p>
+      </div>
+      <div class="about-card">
+        <h3>🛠 Tech Stack</h3>
+        <p><strong style="color:white">Frontend:</strong> Vanilla HTML/CSS/JS optimized for mobile Chrome<br>
+        <strong style="color:white">Styling:</strong> CSS custom properties + glass-morphism + fluid blur<br>
+        <strong style="color:white">Animations:</strong> Pure CSS keyframes with cubic-bezier easing<br>
+        <strong style="color:white">Real-time:</strong> Firebase Firestore (onSnapshot)<br>
+        <strong style="color:white">Storage:</strong> Firebase Firestore + localStorage for settings</p>
+      </div>
+      <div class="about-card">
+        <h3>🔄 Sync Mechanism</h3>
+        <p>Every user gets a stable peerId (stored in localStorage). Video state updates via updateDoc() → triggers onSnapshot() on all devices. Drift detection: if local video is >0.8s out of sync, it auto-corrects silently.</p>
+      </div>
+    </div>
+
+    <div class="about-section">
+      <h2>🚀 How to Use</h2>
+      <div class="step-list">
+        <div class="step-item"><div class="step-num">1</div><div class="step-text"><strong>Create Room</strong> — Enter your name, tap Create Room, get a 5-letter code</div></div>
+        <div class="step-item"><div class="step-num">2</div><div class="step-text"><strong>Share Code</strong> — Send the code to friends. They tap Join Room and enter it</div></div>
+        <div class="step-item"><div class="step-num">3</div><div class="step-text"><strong>Load Video</strong> — Paste any .mp4/.webm URL in the Watch tab and tap Load</div></div>
+        <div class="step-item"><div class="step-num">4</div><div class="step-text"><strong>Press Play</strong> — Syncs for everyone instantly. Pause/seek also syncs!</div></div>
+        <div class="step-item"><div class="step-num">5</div><div class="step-text"><strong>Chat</strong> — Tap the Chat tab to message in real-time with emoji reactions</div></div>
+        <div class="step-item"><div class="step-num">6</div><div class="step-text"><strong>Play Games</strong> — Tap Games tab, pick any game, invite friends from inside it</div></div>
+      </div>
+    </div>
+
+    <div class="about-section">
+      <h2>🔐 Legal & Copyright</h2>
+      <div class="legal-box">
+        <h3>© 2026 CenimaSync — Sai Chatre. All Rights Reserved.</h3>
+        <p><strong style="color:#c4b5fd">COPYRIGHT NOTICE:</strong> All source code, user interface designs, visual assets, game implementations, synchronization algorithms, and all other creative works contained within CenimaSync are the exclusive intellectual property of Sai Chatre, created and published in 2026. Unauthorized reproduction, distribution, modification, reverse engineering, or use of any portion of this software — in whole or in part — without the express written permission of Sai Chatre is strictly prohibited and may subject violators to civil and criminal penalties under applicable intellectual property laws.</p>
+
+        <p><strong style="color:#c4b5fd">TRADEMARK NOTICE:</strong> "CenimaSync" and the CenimaSync logo are unregistered trademarks of Sai Chatre. All rights in the name, branding, and associated marks are reserved. Third-party game names (Chess, Checkers, Ludo, etc.) are property of their respective owners and are used here solely for descriptive purposes in a non-commercial educational context.</p>
+
+        <p><strong style="color:#c4b5fd">DISCLAIMER:</strong> CenimaSync does not host, stream, store, or distribute any copyrighted video content. Users are solely responsible for ensuring they have the legal right to stream any video URL they load into the platform. The developers make no representations or warranties regarding the legality of any content loaded by users.</p>
+
+        <p><strong style="color:#c4b5fd">PRIVACY:</strong> CenimaSync does not collect personal data beyond what is necessary for room functionality (display names and peer IDs). No accounts are created. Room data is automatically deleted after inactivity. Firebase Analytics may collect anonymized usage data per Google's privacy policy.</p>
+
+        <p><strong style="color:#c4b5fd">LICENSE:</strong> This software is provided for personal, non-commercial use only. No license is granted to use, copy, modify, merge, publish, distribute, sublicense, or sell copies of this software without explicit written authorization from Sai Chatre.</p>
+      </div>
+    </div>
+
+    <div class="about-section">
+      <h2>💜 Credits</h2>
+      <div class="credit-card">
+        <span class="credit-heart">💜</span>
+        <div class="credit-name">Sai Chatre</div>
+        <div class="credit-year">Founder & Developer · CenimaSync 2026</div>
+        <p style="font-size:12px;color:var(--text2);margin-top:10px;line-height:1.7">
+          Built with love to solve one problem: watching movies together when you're far apart. Every feature, every animation, every sync mechanism — crafted carefully for the best real-time experience on mobile.
+        </p>
+      </div>
+    </div>
+
+    <div style="text-align:center;padding:20px 0;font-size:11px;color:var(--text3)">
+      CenimaSync v1.0 · Built in 2026 · Made with 💜 in India<br>
+      © 2026 Sai Chatre. All rights reserved.<br>
+      Firebase is a product of Google LLC. All Firebase trademarks belong to Google LLC.
+    </div>
+
+  </div>
+</div>
+
+<!-- ============================================================
+     ROOM SCREEN
+============================================================ -->
+<div class="screen" id="room-screen">
+  <!-- Top Nav -->
+  <div class="room-nav">
+    <div class="room-code-badge" id="room-code-display" onclick="copyRoomCode()">XXXXX</div>
+    <div class="peers-chip" id="peers-chip" onclick="togglePeersPopup()">
+      <div class="dot"></div>
+      <span id="peers-count">1</span>
+    </div>
+    <div class="room-nav-right">
+      <button class="icon-btn" onclick="openInviteSheet()">🔗</button>
+      <button class="icon-btn" onclick="openSettings()">⚙️</button>
+      <button class="icon-btn" onclick="leaveRoom()">🚪</button>
+    </div>
+  </div>
+
+  <!-- Peers Popup -->
+  <div class="peers-popup" id="peers-popup">
+    <div style="font-size:12px;font-weight:700;color:var(--text3);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px">In This Room</div>
+    <div id="peers-popup-list"></div>
+  </div>
+
+  <!-- Content Area -->
+  <div class="room-content">
+
+    <!-- WATCH PANEL -->
+    <div class="panel active" id="watch-panel">
+      <div class="video-wrapper" id="video-wrapper">
+        <div class="video-placeholder" id="video-placeholder">
+          <span>🎬</span>
+          <p>Paste a video URL below to start watching together</p>
+        </div>
+        <video id="main-video" style="display:none" playsinline webkit-playsinline
+               onplay="onVideoPlay()" onpause="onVideoPause()" onseeked="onVideoSeeked()"></video>
+      </div>
+
+      <div class="video-controls-bar" id="video-controls-bar" style="display:none">
+        <button class="vc-btn" id="play-pause-btn" onclick="togglePlayPause()">▶️</button>
+        <div class="progress-bar-wrap" id="progress-wrap" onclick="seekVideo(event)">
+          <div class="progress-bar-fill" id="progress-fill"></div>
+        </div>
+        <div class="time-label" id="time-label">0:00 / 0:00</div>
+        <div class="sync-badge" id="sync-badge">SYNCED</div>
+      </div>
+
+      <div class="url-input-row">
+        <input type="url" id="video-url-input" placeholder="Paste .mp4 or .webm video URL..." autocomplete="off">
+        <button class="url-load-btn" onclick="loadVideo()">Load</button>
+      </div>
+
+      <div class="active-game-bar" id="active-game-bar">
+        <span class="agb-text" id="agb-text">🎮 Someone started a game</span>
+        <button class="agb-join" onclick="joinActiveGame()">Join</button>
+      </div>
+
+      <div class="watch-scroll">
+        <div class="watching-info-card">
+          <div class="wic-title">👥 Currently Watching</div>
+          <div id="watch-peer-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHAT PANEL -->
+    <div class="panel" id="chat-panel">
+      <div class="emoji-btn-row">
+        <div class="emoji-pill" onclick="sendEmoji('❤️')">❤️</div>
+        <div class="emoji-pill" onclick="sendEmoji('😂')">😂</div>
+        <div class="emoji-pill" onclick="sendEmoji('🔥')">🔥</div>
+        <div class="emoji-pill" onclick="sendEmoji('😮')">😮</div>
+        <div class="emoji-pill" onclick="sendEmoji('👏')">👏</div>
+        <div class="emoji-pill" onclick="sendEmoji('🥹')">🥹</div>
+        <div class="emoji-pill" onclick="sendEmoji('😍')">😍</div>
+        <div class="emoji-pill" onclick="sendEmoji('🎉')">🎉</div>
+        <div class="emoji-pill" onclick="sendEmoji('💀')">💀</div>
+        <div class="emoji-pill" onclick="sendEmoji('🤯')">🤯</div>
+      </div>
+      <div class="chat-messages" id="chat-messages">
+        <div class="chat-day-label">Today</div>
+        <div class="msg them fade-in">
+          <div class="msg-ava" style="background:linear-gradient(135deg,#10b981,#06b6d4)">S</div>
+          <div class="msg-body">
+            <div class="msg-name">System</div>
+            <div class="msg-bubble">Welcome to the room! 👋 Share the room code with friends to watch together.</div>
+            <div class="msg-time">now</div>
+          </div>
+        </div>
+      </div>
+      <div class="chat-input-row">
+        <input class="chat-input" id="chat-input" placeholder="Type a message..." autocomplete="off"
+               onkeydown="if(event.key==='Enter')sendMessage()">
+        <button class="send-btn" onclick="sendMessage()">➤</button>
+      </div>
+    </div>
+
+    <!-- GAMES PANEL -->
+    <div class="panel" id="games-panel">
+      <div class="games-scroll">
+        <div class="games-cat-title">🎲 Board Games</div>
+        <div class="games-grid">
+          <div class="game-card" onclick="launchGame('ttt')"><span class="gc-icon">⭕</span><span class="gc-name">Tic Tac Toe</span><span class="gc-players">2 Players</span></div>
+          <div class="game-card" onclick="launchGame('chess')"><span class="gc-icon">♟️</span><span class="gc-name">Chess</span><span class="gc-players">2 Players</span></div>
+          <div class="game-card" onclick="launchGame('c4')"><span class="gc-icon">🔴</span><span class="gc-name">Connect Four</span><span class="gc-players">2 Players</span></div>
+          <div class="game-card" onclick="launchGame('memory')"><span class="gc-icon">🃏</span><span class="gc-name">Memory Match</span><span class="gc-players">2 Players</span></div>
+          <div class="game-card" onclick="launchGame('rps')"><span class="gc-icon">✂️</span><span class="gc-name">Rock Paper Scissors</span><span class="gc-players">2 Players</span></div>
+          <div class="game-card" onclick="launchGame('checkers')"><span class="gc-icon">🔵</span><span class="gc-name">Checkers</span><span class="gc-players">2 Players</span></div>
+        </div>
+
+        <div class="games-cat-title">🎲 Dice & Strategy</div>
+        <div class="games-grid">
+          <div class="game-card" onclick="launchGame('ludo')"><span class="gc-icon">🎲</span><span class="gc-name">Ludo</span><span class="gc-players">2-4 Players</span></div>
+          <div class="game-card" onclick="launchGame('sl')"><span class="gc-icon">🐍</span><span class="gc-name">Snake & Ladder</span><span class="gc-players">2 Players</span></div>
+          <div class="game-card" onclick="launchGame('dice')"><span class="gc-icon">🎯</span><span class="gc-name">Dice Battle</span><span class="gc-players">2 Players</span></div>
+          <div class="game-card" onclick="launchGame('ng')"><span class="gc-icon">🔢</span><span class="gc-name">Number Guess</span><span class="gc-players">2 Players</span></div>
+        </div>
+
+        <div class="games-cat-title">🎉 Party Games</div>
+        <div class="games-grid">
+          <div class="game-card" onclick="launchGame('tod')"><span class="gc-icon">💬</span><span class="gc-name">Truth or Dare</span><span class="gc-players">2+ Players</span></div>
+          <div class="game-card" onclick="launchGame('wyr')"><span class="gc-icon">🤔</span><span class="gc-name">Would You Rather</span><span class="gc-players">2+ Players</span></div>
+          <div class="game-card" onclick="launchGame('quiz')"><span class="gc-icon">🧠</span><span class="gc-name">Quiz Duel</span><span class="gc-players">2 Players</span></div>
+          <div class="game-card" onclick="launchGame('20q')"><span class="gc-icon">❓</span><span class="gc-name">20 Questions</span><span class="gc-players">2 Players</span></div>
+        </div>
+
+        <div class="games-cat-title">💑 Couples Games</div>
+        <div class="games-grid">
+          <div class="game-card" onclick="launchGame('compat')"><span class="gc-icon">💕</span><span class="gc-name">Compatibility Quiz</span><span class="gc-players">2 Players</span></div>
+          <div class="game-card" onclick="launchGame('dare2')"><span class="gc-icon">💌</span><span class="gc-name">Couples Dare</span><span class="gc-players">2 Players</span></div>
+        </div>
+
+        <div style="height:12px"></div>
+      </div>
+    </div>
+
+  </div><!-- end room-content -->
+
+  <!-- Tab Bar -->
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-watch" onclick="switchTab('watch')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+      </svg>
+      <span>Watch</span>
+    </button>
+    <button class="tab-btn" id="tab-chat" onclick="switchTab('chat')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+      </svg>
+      <span>Chat</span>
+      <div class="tab-badge hidden" id="chat-badge">0</div>
+    </button>
+    <button class="tab-btn" id="tab-games" onclick="switchTab('games')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/>
+        <circle cx="15" cy="11" r="1"/><circle cx="17" cy="13" r="1"/>
+        <path d="M3 9a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+      </svg>
+      <span>Games</span>
+    </button>
+  </div>
+</div>
+
+<!-- ============================================================
+     ACTIVE GAME SCREEN
+============================================================ -->
+<div id="game-screen">
+  <div class="game-top-bar">
+    <button class="icon-btn" onclick="exitGame()">←</button>
+    <div class="game-title-text" id="active-game-title">Game</div>
+    <button class="game-invite-btn" onclick="openGameInvite()">
+      👥 Invite Player
+    </button>
+    <button class="icon-btn" onclick="resetCurrentGame()">🔄</button>
+  </div>
+
+  <div class="game-status-bar">
+    <div class="turn-chip">
+      <div class="turn-dot"></div>
+      <span id="game-turn-text">Your Turn</span>
+    </div>
+    <div class="score-row">
+      <div class="score-chip" id="score-p1">You: 0</div>
+      <div class="score-chip" id="score-p2">Opp: 0</div>
+    </div>
+  </div>
+
+  <div class="game-body" id="game-body">
+    <!-- Game content injected here -->
+  </div>
+</div>
+
+</div><!-- end #app -->
+
+<!-- ============================================================
+     MODALS
+============================================================ -->
+
+<!-- Create Room -->
+<div class="modal-overlay" id="create-modal">
+  <div class="modal-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">🎬 Create a Room</div>
+    <div class="sheet-sub">Enter your name to get started. You'll receive a room code to share with friends.</div>
+    <div class="input-group">
+      <label class="input-label">Your Display Name</label>
+      <input class="cs-input" id="create-name" placeholder="e.g. Sai, Alex..." maxlength="20" autocomplete="off">
+    </div>
+    <button class="btn-full" onclick="createRoom()">🚀 Create Room</button>
+    <button class="btn-full secondary" onclick="closeModal('create-modal')">Cancel</button>
+  </div>
+</div>
+
+<!-- Join Room -->
+<div class="modal-overlay" id="join-modal">
+  <div class="modal-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">🔑 Join a Room</div>
+    <div class="sheet-sub">Enter the 5-letter room code shared by your friend.</div>
+    <div class="input-group">
+      <label class="input-label">Your Display Name</label>
+      <input class="cs-input" id="join-name" placeholder="e.g. Sai, Alex..." maxlength="20" autocomplete="off">
+    </div>
+    <div class="input-group">
+      <label class="input-label">Room Code</label>
+      <input class="cs-input code-input" id="join-code" placeholder="ABCDE" maxlength="5" autocomplete="off"
+             oninput="this.value=this.value.toUpperCase()">
+    </div>
+    <button class="btn-full" onclick="joinRoom()">🔑 Join Room</button>
+    <button class="btn-full secondary" onclick="closeModal('join-modal')">Cancel</button>
+  </div>
+</div>
+
+<!-- Invite Link Sheet -->
+<div class="modal-overlay" id="invite-modal">
+  <div class="modal-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">🔗 Invite Friends</div>
+    <div class="sheet-sub">Share the room code or link so friends can join instantly.</div>
+    <div class="input-group">
+      <label class="input-label">Room Code</label>
+      <input class="cs-input code-input" id="share-code-display" readonly style="font-size:28px;letter-spacing:12px">
+    </div>
+    <div class="input-group">
+      <label class="input-label">Invite Link</label>
+      <input class="invite-sheet-input" id="invite-link-input" readonly>
+    </div>
+    <div class="share-row">
+      <button class="share-btn" onclick="copyInviteLink()">📋 Copy Link</button>
+      <button class="share-btn" onclick="shareWhatsApp()">💬 WhatsApp</button>
+      <button class="share-btn" onclick="shareTelegram()">✈️ Telegram</button>
+    </div>
+    <button class="btn-full secondary mt12" onclick="closeModal('invite-modal')">Done</button>
+  </div>
+</div>
+
+<!-- Settings -->
+<div class="settings-panel" id="settings-panel">
+  <div class="settings-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">⚙️ Settings</div>
+    <div style="margin-top:16px">
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Accent Color</div>
+          <div class="setting-sub">Choose your vibe</div>
+        </div>
+        <div class="color-swatches">
+          <div class="swatch active" style="background:#7c3aed" onclick="setAccent('#7c3aed','rgba(124,58,237,0.35)',this)"></div>
+          <div class="swatch" style="background:#06b6d4" onclick="setAccent('#06b6d4','rgba(6,182,212,0.35)',this)"></div>
+          <div class="swatch" style="background:#ec4899" onclick="setAccent('#ec4899','rgba(236,72,153,0.35)',this)"></div>
+          <div class="swatch" style="background:#84cc16" onclick="setAccent('#84cc16','rgba(132,204,22,0.35)',this)"></div>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Sound Effects</div>
+          <div class="setting-sub">Play sounds on messages & games</div>
+        </div>
+        <div class="toggle on" id="toggle-sound" onclick="toggleSetting('sound')"></div>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Notifications</div>
+          <div class="setting-sub">Show alerts for invites & messages</div>
+        </div>
+        <div class="toggle on" id="toggle-notif" onclick="toggleSetting('notif')"></div>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Reduce Motion</div>
+          <div class="setting-sub">Disable background animations</div>
+        </div>
+        <div class="toggle" id="toggle-motion" onclick="toggleSetting('motion')"></div>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Compact Chat</div>
+          <div class="setting-sub">Smaller message spacing</div>
+        </div>
+        <div class="toggle" id="toggle-compact" onclick="toggleSetting('compact')"></div>
+      </div>
+    </div>
+    <button class="btn-full secondary mt16" onclick="closeSettings()">Close</button>
+  </div>
+</div>
+
+<!-- Game Invite Popup (sent to others) -->
+<div class="popup-modal" id="game-invite-popup">
+  <div class="popup-card">
+    <span class="popup-icon" id="gi-icon">🎮</span>
+    <div class="popup-title" id="gi-title">Game Invite!</div>
+    <div class="popup-sub" id="gi-sub">Someone invited you to play</div>
+    <div class="popup-btns">
+      <button class="popup-btn yes" onclick="acceptGameInvite()">✅ Yes, Join!</button>
+      <button class="popup-btn no" onclick="declineGameInvite()">❌ No Thanks</button>
+    </div>
+  </div>
+</div>
+
+<!-- Game Started Notification -->
+<div class="popup-modal" id="game-started-popup">
+  <div class="popup-card">
+    <span class="popup-icon" id="gs-icon">🎮</span>
+    <div class="popup-title" id="gs-title">Game Started!</div>
+    <div class="popup-sub" id="gs-sub">Someone started a game in the room</div>
+    <div class="popup-btns">
+      <button class="popup-btn yes" onclick="joinFromNotif()">🎮 Join Game</button>
+      <button class="popup-btn no" onclick="closePopup('game-started-popup')">Later</button>
+    </div>
+  </div>
+</div>
+
+<!-- Game Result -->
+<div class="popup-modal" id="result-popup">
+  <div class="popup-card">
+    <span class="popup-icon" id="result-icon">🏆</span>
+    <div class="popup-title" id="result-title">Game Over!</div>
+    <div class="popup-sub" id="result-sub">Great game!</div>
+    <div class="popup-btns">
+      <button class="popup-btn yes" onclick="resetCurrentGame();closePopup('result-popup')">🔄 Play Again</button>
+      <button class="popup-btn no" onclick="exitGame();closePopup('result-popup')">🏠 Exit</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- ============================================================
+     JAVASCRIPT
+============================================================ -->
+<script>
+// ============================================================
+// FIREBASE INIT
+// ============================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyASzRa7tqGaYLGZwUmRXKLYm60mejoAPNg",
+  authDomain: "cenimasync.firebaseapp.com",
+  projectId: "cenimasync",
+  storageBucket: "cenimasync.firebasestorage.app",
+  messagingSenderId: "948318184524",
+  appId: "1:948318184524:web:b4b13cad4356bad92dc0e9",
+  measurementId: "G-PC4G1KEJ7C"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+let analytics;
+try { analytics = firebase.analytics(); } catch(e) {}
+
+// ============================================================
+// APP STATE
+// ============================================================
+const state = {
+  peerId: localStorage.getItem('cs_peerId') || genId(12),
+  userName: localStorage.getItem('cs_userName') || '',
+  roomCode: null,
+  isHost: false,
+  peers: {},
+  currentGame: null,
+  gameOver: false,
+  gameTurn: 1,   // 1 = P1 (you), 2 = P2 (opponent)
+  myPlayerNum: 1,
+  scores: { p1:0, p2:0 },
+  unreadChat: 0,
+  activeTab: 'watch',
+  settings: JSON.parse(localStorage.getItem('cs_settings') || '{}'),
+  // Subscriptions
+  _unsubs: []
+};
+
+localStorage.setItem('cs_peerId', state.peerId);
+
+// ============================================================
+// UTILITY
+// ============================================================
+function genId(n=8) {
+  return Math.random().toString(36).substr(2,n).toUpperCase();
+}
+
+function genRoomCode() {
+  return Math.random().toString(36).substr(2,5).toUpperCase();
+}
+
+let _toastTimer;
+function showToast(msg, dur=2800) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), dur);
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('active');
+}
+
+function openPopup(id) {
+  document.getElementById(id).classList.add('open');
+}
+
+function closePopup(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+function fmtTime(s) {
+  if (isNaN(s)) return '0:00';
+  const m = Math.floor(s/60);
+  const sec = Math.floor(s%60).toString().padStart(2,'0');
+  return `${m}:${sec}`;
+}
+
+function getAvatarColor(name) {
+  const colors = ['#7c3aed','#4f46e5','#ec4899','#10b981','#f59e0b','#06b6d4','#ef4444','#8b5cf6'];
+  let hash = 0;
+  for (let c of (name||'')) hash = c.charCodeAt(0) + ((hash<<5)-hash);
+  return colors[Math.abs(hash) % colors.length];
+}
+
+// ============================================================
+// HOME NAVIGATION
+// ============================================================
+function showAbout() { showScreen('about-screen'); }
+
+function openCreateRoom() {
+  document.getElementById('create-modal').classList.add('active');
+  setTimeout(() => document.getElementById('create-name').focus(), 300);
+}
+
+function openJoinRoom() {
+  document.getElementById('join-modal').classList.add('active');
+  setTimeout(() => document.getElementById('join-name').focus(), 300);
+}
+
+// ============================================================
+// CREATE ROOM
+// ============================================================
+async function createRoom() {
+  const name = document.getElementById('create-name').value.trim();
+  if (!name) { showToast('Please enter your name'); return; }
+
+  state.userName = name;
+  localStorage.setItem('cs_userName', name);
+
+  const code = genRoomCode();
+  state.roomCode = code;
+  state.isHost = true;
+  state.myPlayerNum = 1;
+
+  showToast('Creating room...');
+
+  try {
+    await db.collection('rooms').doc(code).set({
+      code,
+      host: state.peerId,
+      hostName: name,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      videoUrl: '',
+      videoState: { playing: false, currentTime: 0, updatedAt: Date.now() },
+      activeGame: null,
+      activeGameName: null
+    });
+
+    await db.collection('rooms').doc(code)
+            .collection('peers').doc(state.peerId).set({
+      peerId: state.peerId,
+      name,
+      isHost: true,
+      joinedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      playerNum: 1
+    });
+
+    closeModal('create-modal');
+    enterRoom(code);
+  } catch(e) {
+    console.error(e);
+    showToast('Failed to create room. Check connection.');
+  }
+}
+
+// ============================================================
+// JOIN ROOM
+// ============================================================
+async function joinRoom() {
+  const name = document.getElementById('join-name').value.trim();
+  const code = document.getElementById('join-code').value.trim().toUpperCase();
+  if (!name) { showToast('Please enter your name'); return; }
+  if (code.length !== 5) { showToast('Enter a 5-letter room code'); return; }
+
+  state.userName = name;
+  localStorage.setItem('cs_userName', name);
+  state.roomCode = code;
+  state.isHost = false;
+
+  showToast('Joining room...');
+
+  try {
+    const roomDoc = await db.collection('rooms').doc(code).get();
+    if (!roomDoc.exists) { showToast('Room not found! Check the code.'); return; }
+
+    // Count existing peers to assign player number
+    const peersSnap = await db.collection('rooms').doc(code).collection('peers').get();
+    state.myPlayerNum = peersSnap.size + 1;
+
+    await db.collection('rooms').doc(code)
+            .collection('peers').doc(state.peerId).set({
+      peerId: state.peerId,
+      name,
+      isHost: false,
+      joinedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      playerNum: state.myPlayerNum
+    });
+
+    closeModal('join-modal');
+    enterRoom(code);
+  } catch(e) {
+    console.error(e);
+    showToast('Failed to join room. Check connection.');
+  }
+}
+
+// ============================================================
+// ENTER ROOM
+// ============================================================
+function enterRoom(code) {
+  showScreen('room-screen');
+  document.getElementById('room-code-display').textContent = code;
+  document.getElementById('share-code-display').value = code;
+  document.getElementById('invite-link-input').value = `https://cenimasync.app/join/${code}`;
+
+  switchTab('watch');
+  subscribeToRoom(code);
+  subscribeToPeers(code);
+  subscribeToChat(code);
+  subscribeToGameState(code);
+  subscribeToInvites(code);
+
+  // Remove self on disconnect
+  db.collection('rooms').doc(code)
+    .collection('peers').doc(state.peerId)
+    .onSnapshot(() => {});
+}
+
+// ============================================================
+// FIRESTORE SUBSCRIPTIONS
+// ============================================================
+function subscribeToRoom(code) {
+  const unsub = db.collection('rooms').doc(code).onSnapshot(snap => {
+    if (!snap.exists) { leaveRoom(); return; }
+    const data = snap.data();
+
+    // Video sync
+    const vs = data.videoState;
+    if (vs && data.videoUrl) {
+      const vid = document.getElementById('main-video');
+      if (vid.src !== data.videoUrl) {
+        loadVideoFromState(data.videoUrl);
+      }
+      if (!state._ignoreSync) {
+        const diff = Math.abs(vid.currentTime - vs.currentTime);
+        if (diff > 0.8) vid.currentTime = vs.currentTime;
+        if (vs.playing && vid.paused)  vid.play().catch(()=>{});
+        if (!vs.playing && !vid.paused) vid.pause();
+      }
+    }
+
+    // Active game bar
+    if (data.activeGame && data.activeGame !== state.currentGame) {
+      const bar = document.getElementById('active-game-bar');
+      bar.classList.add('visible');
+      document.getElementById('agb-text').textContent = `🎮 ${data.hostName} started ${data.activeGameName || 'a game'}`;
+      state._pendingGame = data.activeGame;
+      state._pendingGameName = data.activeGameName;
+
+      // Show popup to non-host if not already in that game
+      if (!state.isHost && !document.getElementById('game-screen').classList.contains('open')) {
+        document.getElementById('gs-icon').textContent = getGameIcon(data.activeGame);
+        document.getElementById('gs-title').textContent = `${data.hostName} started ${data.activeGameName}!`;
+        document.getElementById('gs-sub').textContent = 'Tap to join and play together';
+        openPopup('game-started-popup');
+      }
+    }
+  });
+  state._unsubs.push(unsub);
+}
+
+function subscribeToPeers(code) {
+  const unsub = db.collection('rooms').doc(code)
+    .collection('peers').onSnapshot(snap => {
+      state.peers = {};
+      snap.forEach(doc => { state.peers[doc.id] = doc.data(); });
+      renderPeers();
+      document.getElementById('peers-count').textContent =
+        `${Object.keys(state.peers).length} watching`;
+    });
+  state._unsubs.push(unsub);
+}
+
+function subscribeToChat(code) {
+  const unsub = db.collection('rooms').doc(code)
+    .collection('messages')
+    .orderBy('ts','asc')
+    .limitToLast(100)
+    .onSnapshot(snap => {
+      snap.docChanges().forEach(change => {
+        if (change.type === 'added') {
+          const msg = change.doc.data();
+          appendChatMessage(msg);
+          if (state.activeTab !== 'chat' && msg.peerId !== state.peerId) {
+            state.unreadChat++;
+            updateChatBadge();
+          }
+        }
+      });
+    });
+  state._unsubs.push(unsub);
+}
+
+function subscribeToGameState(code) {
+  const unsub = db.collection('rooms').doc(code)
+    .collection('gamestate').doc('current')
+    .onSnapshot(snap => {
+      if (!snap.exists) return;
+      const data = snap.data();
+      if (data.game !== state.currentGame) return;
+      if (data.updatedBy === state.peerId) return; // ignore own updates
+      syncGameState(data);
+    });
+  state._unsubs.push(unsub);
+}
+
+function subscribeToInvites(code) {
+  const unsub = db.collection('rooms').doc(code)
+    .collection('invites')
+    .where('to','==',state.peerId)
+    .where('status','==','pending')
+    .onSnapshot(snap => {
+      snap.docChanges().forEach(change => {
+        if (change.type === 'added') {
+          const inv = change.doc.data();
+          state._pendingInviteId = change.doc.id;
+          state._pendingInviteGame = inv.game;
+          state._pendingInviteGameName = inv.gameName;
+          document.getElementById('gi-icon').textContent = getGameIcon(inv.game);
+          document.getElementById('gi-title').textContent = `${inv.fromName} invited you!`;
+          document.getElementById('gi-sub').textContent = `Join ${inv.gameName} and play together`;
+          openPopup('game-invite-popup');
+        }
+      });
+    });
+  state._unsubs.push(unsub);
+}
+
+function unsubscribeAll() {
+  state._unsubs.forEach(fn => fn());
+  state._unsubs = [];
+}
+
+// ============================================================
+// PEERS RENDER
+// ============================================================
+function renderPeers() {
+  const list = document.getElementById('watch-peer-list');
+  const popup = document.getElementById('peers-popup-list');
+  list.innerHTML = ''; popup.innerHTML = '';
+
+  Object.values(state.peers).forEach(peer => {
+    const isMe = peer.peerId === state.peerId;
+    const color = getAvatarColor(peer.name);
+    const initial = (peer.name||'?')[0].toUpperCase();
+
+    // Watch panel peer row
+    const row = document.createElement('div');
+    row.className = 'peer-row';
+    row.innerHTML = `
+      <div class="peer-avatar" style="background:${color}">${initial}</div>
+      <div class="peer-name">${peer.name}${peer.isHost?' 👑':''}</div>
+      ${isMe ? '<span class="peer-badge you">YOU</span>' : ''}
+      ${peer.isHost && !isMe ? '<span class="peer-badge">HOST</span>' : ''}
+      ${!isMe ? `<button class="invite-btn-peer" onclick="sendDirectInvite('${peer.peerId}','${peer.name}')">Invite to Game</button>` : ''}
+    `;
+    list.appendChild(row);
+
+    // Popup row
+    const prow = document.createElement('div');
+    prow.className = 'peer-row';
+    prow.innerHTML = `
+      <div class="peer-avatar" style="background:${color};width:26px;height:26px;font-size:11px">${initial}</div>
+      <div class="peer-name" style="font-size:12px">${peer.name}</div>
+      ${isMe ? '<span class="peer-badge you" style="font-size:9px">YOU</span>' : ''}
+      ${peer.isHost && !isMe ? '<span class="peer-badge" style="font-size:9px">HOST</span>' : ''}
+    `;
+    popup.appendChild(prow);
+  });
+}
+
+let _peersPopupOpen = false;
+function togglePeersPopup() {
+  _peersPopupOpen = !_peersPopupOpen;
+  const pp = document.getElementById('peers-popup');
+  _peersPopupOpen ? pp.classList.add('open') : pp.classList.remove('open');
+}
+
+document.addEventListener('click', e => {
+  if (_peersPopupOpen && !e.target.closest('#peers-popup') && !e.target.closest('#peers-chip')) {
+    _peersPopupOpen = false;
+    document.getElementById('peers-popup').classList.remove('open');
+  }
+});
+
+// ============================================================
+// LEAVE ROOM
+// ============================================================
+async function leaveRoom() {
+  if (state.roomCode) {
+    try {
+      await db.collection('rooms').doc(state.roomCode)
+              .collection('peers').doc(state.peerId).delete();
+    } catch(e) {}
+  }
+  unsubscribeAll();
+  state.roomCode = null;
+  exitGame();
+  showScreen('home-screen');
+  showToast('Left the room');
+}
+
+// ============================================================
+// TAB SWITCHING
+// ============================================================
+function switchTab(tab) {
+  state.activeTab = tab;
+  ['watch','chat','games'].forEach(t => {
+    document.getElementById(`tab-${t}`).classList.toggle('active', t===tab);
+    document.getElementById(`${t}-panel`).classList.toggle('active', t===tab);
+  });
+  if (tab === 'chat') {
+    state.unreadChat = 0;
+    updateChatBadge();
+    scrollChatToBottom();
+  }
+}
+
+function updateChatBadge() {
+  const b = document.getElementById('chat-badge');
+  if (state.unreadChat > 0) {
+    b.textContent = state.unreadChat > 9 ? '9+' : state.unreadChat;
+    b.classList.remove('hidden');
+  } else {
+    b.classList.add('hidden');
+  }
+}
+
+// ============================================================
+// VIDEO
+// ============================================================
+let _syncLock = false;
+
+function loadVideo() {
+  const url = document.getElementById('video-url-input').value.trim();
+  if (!url) { showToast('Paste a video URL first'); return; }
+  loadVideoFromState(url);
+  if (state.roomCode) {
+    db.collection('rooms').doc(state.roomCode).update({
+      videoUrl: url,
+      videoState: { playing: false, currentTime: 0, updatedAt: Date.now() }
+    }).catch(()=>{});
+  }
+}
+
+function loadVideoFromState(url) {
+  const vid = document.getElementById('main-video');
+  const ph  = document.getElementById('video-placeholder');
+  const bar = document.getElementById('video-controls-bar');
+  vid.src = url;
+  ph.style.display = 'none';
+  vid.style.display = 'block';
+  bar.style.display = 'flex';
+  vid.load();
+  vid.addEventListener('timeupdate', updateProgress);
+  vid.addEventListener('loadedmetadata', updateProgress);
+}
+
+function togglePlayPause() {
+  const vid = document.getElementById('main-video');
+  if (vid.paused) { vid.play(); } else { vid.pause(); }
+}
+
+function onVideoPlay() {
+  document.getElementById('play-pause-btn').textContent = '⏸️';
+  pushVideoState(true);
+}
+
+function onVideoPause() {
+  document.getElementById('play-pause-btn').textContent = '▶️';
+  pushVideoState(false);
+}
+
+function onVideoSeeked() {
+  pushVideoState(!document.getElementById('main-video').paused);
+}
+
+function pushVideoState(playing) {
+  if (!state.roomCode || _syncLock) return;
+  const vid = document.getElementById('main-video');
+  db.collection('rooms').doc(state.roomCode).update({
+    videoState: { playing, currentTime: vid.currentTime, updatedAt: Date.now() }
+  }).catch(()=>{});
+}
+
+function seekVideo(e) {
+  const vid = document.getElementById('main-video');
+  if (!vid.duration) return;
+  const rect = e.currentTarget.getBoundingClientRect();
+  const pct = (e.clientX - rect.left) / rect.width;
+  vid.currentTime = pct * vid.duration;
+}
+
+function updateProgress() {
+  const vid = document.getElementById('main-video');
+  if (!vid.duration) return;
+  const pct = (vid.currentTime / vid.duration) * 100;
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('time-label').textContent =
+    `${fmtTime(vid.currentTime)} / ${fmtTime(vid.duration)}`;
+}
+
+// ============================================================
+// CHAT
+// ============================================================
+async function sendMessage() {
+  const inp = document.getElementById('chat-input');
+  const text = inp.value.trim();
+  if (!text || !state.roomCode) return;
+  inp.value = '';
+
+  const msg = {
+    peerId: state.peerId,
+    name: state.userName,
+    text,
+    ts: firebase.firestore.FieldValue.serverTimestamp(),
+    type: 'text'
+  };
+
+  await db.collection('rooms').doc(state.roomCode)
+          .collection('messages').add(msg).catch(()=>{});
+}
+
+async function sendEmoji(emoji) {
+  if (!state.roomCode) return;
+  const msg = {
+    peerId: state.peerId,
+    name: state.userName,
+    text: emoji,
+    ts: firebase.firestore.FieldValue.serverTimestamp(),
+    type: 'emoji'
+  };
+  await db.collection('rooms').doc(state.roomCode)
+          .collection('messages').add(msg).catch(()=>{});
+}
+
+function appendChatMessage(msg) {
+  const container = document.getElementById('chat-messages');
+  const isMe = msg.peerId === state.peerId;
+  const color = getAvatarColor(msg.name||'?');
+  const initial = (msg.name||'?')[0].toUpperCase();
+
+  const div = document.createElement('div');
+  div.className = `msg ${isMe?'me':'them'} fade-in`;
+  div.innerHTML = `
+    <div class="msg-ava" style="background:${color}">${initial}</div>
+    <div class="msg-body">
+      ${!isMe ? `<div class="msg-name">${escHtml(msg.name||'?')}</div>` : ''}
+      <div class="msg-bubble">${escHtml(msg.text||'')}</div>
+      <div class="msg-time">${formatMsgTime(msg.ts)}</div>
+    </div>
+  `;
+  container.appendChild(div);
+  if (state.activeTab === 'chat') scrollChatToBottom();
+}
+
+function scrollChatToBottom() {
+  const c = document.getElementById('chat-messages');
+  c.scrollTop = c.scrollHeight;
+}
+
+function formatMsgTime(ts) {
+  if (!ts) return 'now';
+  try {
+    const d = ts.toDate ? ts.toDate() : new Date();
+    return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  } catch(e) { return 'now'; }
+}
+
+function escHtml(str) {
+  return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ============================================================
+// INVITE SYSTEM
+// ============================================================
+function openInviteSheet() {
+  document.getElementById('invite-modal').classList.add('active');
+}
+
+function copyRoomCode() {
+  navigator.clipboard.writeText(state.roomCode||'').then(() => showToast('📋 Room code copied!')).catch(()=>{});
+}
+
+function copyInviteLink() {
+  const link = document.getElementById('invite-link-input').value;
+  navigator.clipboard.writeText(link).then(() => showToast('📋 Link copied!')).catch(()=>{});
+}
+
+function shareWhatsApp() {
+  const link = document.getElementById('invite-link-input').value;
+  const text = `Join me on CenimaSync! Room code: ${state.roomCode}\n${link}`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+}
+
+function shareTelegram() {
+  const link = document.getElementById('invite-link-input').value;
+  window.open(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent('Join me on CenimaSync! Room code: '+state.roomCode)}`, '_blank');
+}
+
+// ============================================================
+// GAME INVITE
+// ============================================================
+async function sendDirectInvite(toPeerId, toName) {
+  if (!state.currentGame || !state.roomCode) {
+    showToast('Start a game first, then invite!');
+    return;
+  }
+  const inv = {
+    from: state.peerId,
+    fromName: state.userName,
+    to: toPeerId,
+    game: state.currentGame,
+    gameName: getGameName(state.currentGame),
+    status: 'pending',
+    ts: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  await db.collection('rooms').doc(state.roomCode)
+          .collection('invites').add(inv).catch(()=>{});
+  showToast(`Invite sent to ${toName}! 🎮`);
+}
+
+async function openGameInvite() {
+  // Show list of peers to invite
+  const peers = Object.values(state.peers).filter(p => p.peerId !== state.peerId);
+  if (peers.length === 0) {
+    showToast('No other players in the room yet. Share the room code!');
+    return;
+  }
+  // For simplicity, invite all other peers
+  for (const peer of peers) {
+    await sendDirectInvite(peer.peerId, peer.name);
+  }
+}
+
+async function acceptGameInvite() {
+  closePopup('game-invite-popup');
+  if (state._pendingInviteId && state.roomCode) {
+    await db.collection('rooms').doc(state.roomCode)
+            .collection('invites').doc(state._pendingInviteId)
+            .update({ status: 'accepted' }).catch(()=>{});
+  }
+  launchGame(state._pendingInviteGame || state._pendingGame);
+}
+
+function declineGameInvite() {
+  closePopup('game-invite-popup');
+  if (state._pendingInviteId && state.roomCode) {
+    db.collection('rooms').doc(state.roomCode)
+      .collection('invites').doc(state._pendingInviteId)
+      .update({ status: 'declined' }).catch(()=>{});
+  }
+  showToast('Invite declined');
+}
+
+function joinFromNotif() {
+  closePopup('game-started-popup');
+  if (state._pendingGame) launchGame(state._pendingGame);
+}
+
+function joinActiveGame() {
+  if (state._pendingGame) launchGame(state._pendingGame);
+}
+
+// ============================================================
+// GAME LAUNCHER
+// ============================================================
+const GAME_NAMES = {
+  ttt:'Tic Tac Toe',chess:'Chess',c4:'Connect Four',
+  memory:'Memory Match',rps:'Rock Paper Scissors',
+  ludo:'Ludo',sl:'Snake & Ladder',dice:'Dice Battle',
+  ng:'Number Guess',tod:'Truth or Dare',wyr:'Would You Rather',
+  quiz:'Quiz Duel','20q':'20 Questions',compat:'Compatibility Quiz',
+  dare2:'Couples Dare',checkers:'Checkers'
+};
+
+const GAME_ICONS = {
+  ttt:'⭕',chess:'♟️',c4:'🔴',memory:'🃏',rps:'✂️',
+  ludo:'🎲',sl:'🐍',dice:'🎯',ng:'🔢',tod:'💬',
+  wyr:'🤔',quiz:'🧠','20q':'❓',compat:'💕',dare2:'💌',checkers:'🔵'
+};
+
+function getGameName(id) { return GAME_NAMES[id] || id; }
+function getGameIcon(id) { return GAME_ICONS[id] || '🎮'; }
+
+function launchGame(gameId) {
+  state.currentGame = gameId;
+  state.gameOver = false;
+  state.gameTurn = 1;
+  state.scores = { p1:0, p2:0 };
+
+  const name = getGameName(gameId);
+  document.getElementById('active-game-title').textContent = `${getGameIcon(gameId)} ${name}`;
+  document.getElementById('score-p1').textContent = `${state.userName||'You'}: 0`;
+  document.getElementById('score-p2').textContent = `Opp: 0`;
+  updateGameTurnUI();
+
+  document.getElementById('game-screen').classList.add('open');
+
+  // Notify room
+  if (state.roomCode) {
+    db.collection('rooms').doc(state.roomCode).update({
+      activeGame: gameId,
+      activeGameName: name,
+      startedBy: state.peerId,
+      startedByName: state.userName
+    }).catch(()=>{});
+  }
+
+  // Init game
+  initGame(gameId);
+}
+
+function exitGame() {
+  document.getElementById('game-screen').classList.remove('open');
+  state.currentGame = null;
+  state.gameOver = false;
+}
+
+function resetCurrentGame() {
+  if (state.currentGame) {
+    state.gameOver = false;
+    state.gameTurn = 1;
+    updateGameTurnUI();
+    initGame(state.currentGame);
+  }
+}
+
+function updateGameTurnUI() {
+  const isMyTurn = state.gameTurn === state.myPlayerNum;
+  document.getElementById('game-turn-text').textContent =
+    isMyTurn ? '🟢 Your Turn' : "⏳ Opponent's Turn";
+}
+
+function canIPlay() {
+  return !state.gameOver && state.gameTurn === state.myPlayerNum;
+}
+
+function switchGameTurn() {
+  state.gameTurn = state.gameTurn === 1 ? 2 : 1;
+  updateGameTurnUI();
+}
+
+function pushGameState(data) {
+  if (!state.roomCode || !state.currentGame) return;
+  db.collection('rooms').doc(state.roomCode)
+    .collection('gamestate').doc('current')
+    .set({ game: state.currentGame, updatedBy: state.peerId, ts: Date.now(), ...data })
+    .catch(()=>{});
+}
+
+function syncGameState(data) {
+  // Each game handles its own sync
+  if (!state.currentGame) return;
+  switch(state.currentGame) {
+    case 'ttt':   syncTTT(data); break;
+    case 'c4':    syncC4(data);  break;
+    case 'chess': syncChess(data); break;
+    case 'ng':    syncNG(data);  break;
+    case 'rps':   syncRPS(data); break;
+    case 'memory': syncMemory(data); break;
+    default: break;
+  }
+}
+
+// ============================================================
+// INIT GAME ROUTER
+// ============================================================
+function initGame(id) {
+  const body = document.getElementById('game-body');
+  body.innerHTML = '';
+  switch(id) {
+    case 'ttt':     initTTT(body);     break;
+    case 'chess':   initChess(body);   break;
+    case 'c4':      initC4(body);      break;
+    case 'memory':  initMemory(body);  break;
+    case 'rps':     initRPS(body);     break;
+    case 'sl':      initSL(body);      break;
+    case 'ludo':    initLudo(body);    break;
+    case 'dice':    initDice(body);    break;
+    case 'ng':      initNG(body);      break;
+    case 'tod':     initTOD(body);     break;
+    case 'wyr':     initWYR(body);     break;
+    case 'quiz':    initQuiz(body);    break;
+    case '20q':     init20Q(body);     break;
+    case 'compat':  initCompat(body);  break;
+    case 'dare2':   initDare2(body);   break;
+    case 'checkers':initCheckers(body);break;
+    default:
+      body.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text2)">
+        <div style="font-size:48px;margin-bottom:12px">${getGameIcon(id)}</div>
+        <div style="font-size:18px;font-weight:700">${getGameName(id)}</div>
+        <div style="font-size:13px;margin-top:8px">Coming soon!</div>
+      </div>`;
+  }
+}
+
+function showGameResult(icon, title, sub) {
+  state.gameOver = true;
+  document.getElementById('result-icon').textContent = icon;
+  document.getElementById('result-title').textContent = title;
+  document.getElementById('result-sub').textContent = sub;
+  setTimeout(() => openPopup('result-popup'), 400);
+}
+
+// ============================================================
+// TTT
+// ============================================================
+let tttBoard = [], tttWinCombo = null;
+const TTT_WINS = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+function initTTT(body) {
+  tttBoard = Array(9).fill(null);
+  tttWinCombo = null;
+  const wrap = document.createElement('div');
+  wrap.className = 'ttt-wrap';
+  wrap.innerHTML = '<div class="ttt-grid" id="ttt-grid"></div>';
+  body.appendChild(wrap);
+  renderTTT();
+}
+
+function renderTTT() {
+  const grid = document.getElementById('ttt-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  tttBoard.forEach((cell, i) => {
+    const div = document.createElement('div');
+    div.className = 'ttt-cell' + (cell ? ' filled' : '');
+    if (cell === 'X') div.classList.add('x');
+    if (cell === 'O') div.classList.add('o');
+    if (tttWinCombo && tttWinCombo.includes(i)) div.classList.add('win');
+    if (cell || state.gameOver || !canIPlay()) div.classList.add('disabled');
+    div.textContent = cell || '';
+    div.onclick = () => tttClick(i);
+    grid.appendChild(div);
+  });
+}
+
+function tttClick(i) {
+  if (!canIPlay() || tttBoard[i] || state.gameOver) return;
+  const sym = state.myPlayerNum === 1 ? 'X' : 'O';
+  tttBoard[i] = sym;
+  const win = checkTTTWin();
+  if (win) {
+    tttWinCombo = win;
+    renderTTT();
+    state.scores[`p${state.myPlayerNum}`]++;
+    updateScoreUI();
+    pushGameState({ tttBoard, winner: state.myPlayerNum });
+    setTimeout(() => showGameResult('🏆', 'You Win!', `${sym} wins the game!`), 400);
+    state.gameOver = true;
+    return;
+  }
+  if (tttBoard.every(c => c)) {
+    renderTTT();
+    pushGameState({ tttBoard, winner: 0 });
+    showGameResult('🤝', "It's a Draw!", 'Well played both!');
+    return;
+  }
+  pushGameState({ tttBoard, turn: state.gameTurn === 1 ? 2 : 1 });
+  switchGameTurn();
+  renderTTT();
+}
+
+function checkTTTWin() {
+  for (const [a,b,c] of TTT_WINS) {
+    if (tttBoard[a] && tttBoard[a]===tttBoard[b] && tttBoard[a]===tttBoard[c]) return [a,b,c];
+  }
+  return null;
+}
+
+function syncTTT(data) {
+  if (data.tttBoard) { tttBoard = data.tttBoard; }
+  if (data.turn !== undefined) {
+    state.gameTurn = data.turn;
+    updateGameTurnUI();
+  }
+  if (data.winner !== undefined && data.winner !== null) {
+    if (data.winner === 0) {
+      showGameResult('🤝',"It's a Draw!",'Well played both!');
+    } else if (data.winner !== state.myPlayerNum) {
+      tttWinCombo = null;
+      renderTTT();
+      showGameResult('😅','You Lost!','Better luck next time!');
+    }
+    state.gameOver = true;
+    return;
+  }
+  renderTTT();
+}
+
+// ============================================================
+// CONNECT FOUR
+// ============================================================
+let c4Grid = [];
+const C4R=6, C4C=7;
+
+function initC4(body) {
+  c4Grid = Array.from({length:C4R}, () => Array(C4C).fill(0));
+  const wrap = document.createElement('div');
+  wrap.className = 'c4-wrap';
+  wrap.innerHTML = `<div class="c4-col-btns" id="c4-col-btns"></div><div class="c4-board" id="c4-board"></div>`;
+  body.appendChild(wrap);
+  renderC4();
+}
+
+function renderC4() {
+  const colBtns = document.getElementById('c4-col-btns');
+  const board = document.getElementById('c4-board');
+  if (!colBtns || !board) return;
+
+  colBtns.innerHTML = '';
+  for (let c=0;c<C4C;c++) {
+    const b = document.createElement('button');
+    b.className = 'c4-col-btn';
+    b.textContent = '▼';
+    b.disabled = state.gameOver || !canIPlay() || c4Grid[0][c]!==0;
+    b.onclick = () => dropC4(c);
+    colBtns.appendChild(b);
+  }
+
+  board.innerHTML = '';
+  for (let r=0;r<C4R;r++) for (let c=0;c<C4C;c++) {
+    const cell = document.createElement('div');
+    cell.className = 'c4-cell';
+    if (c4Grid[r][c]===1) cell.classList.add('p1');
+    if (c4Grid[r][c]===2) cell.classList.add('p2');
+    board.appendChild(cell);
+  }
+}
+
+function dropC4(col) {
+  if (!canIPlay() || state.gameOver) return;
+  let row=-1;
+  for (let r=C4R-1;r>=0;r--) { if(c4Grid[r][col]===0){row=r;break;} }
+  if (row===-1) return;
+  c4Grid[row][col] = state.myPlayerNum;
+  const win = checkC4Win();
+  if (win) {
+    renderC4();
+    win.forEach(([r,c])=> { const cells=document.getElementById('c4-board').children; cells[r*C4C+c].classList.add('win'); });
+    state.scores[`p${state.myPlayerNum}`]++;
+    updateScoreUI();
+    pushGameState({ c4Grid, winner: state.myPlayerNum });
+    state.gameOver = true;
+    setTimeout(()=>showGameResult('🏆','You Win!','Connected four!'),400);
+    return;
+  }
+  if (c4Grid[0].every(c=>c!==0)) {
+    renderC4();
+    pushGameState({ c4Grid, winner:0 });
+    showGameResult('🤝',"It's a Draw!",'Board is full!');
+    return;
+  }
+  pushGameState({ c4Grid, turn: state.gameTurn===1?2:1 });
+  switchGameTurn();
+  renderC4();
+}
+
+function checkC4Win() {
+  const dirs=[[0,1],[1,0],[1,1],[1,-1]];
+  for (let r=0;r<C4R;r++) for (let c=0;c<C4C;c++) {
+    if (!c4Grid[r][c]) continue;
+    for (const [dr,dc] of dirs) {
+      const cells=[[r,c]];
+      for (let k=1;k<4;k++) {
+        const nr=r+dr*k,nc=c+dc*k;
+        if (nr<0||nr>=C4R||nc<0||nc>=C4C) break;
+        if (c4Grid[nr][nc]!==c4Grid[r][c]) break;
+        cells.push([nr,nc]);
+      }
+      if (cells.length===4) return cells;
+    }
+  }
+  return null;
+}
+
+function syncC4(data) {
+  if (data.c4Grid) c4Grid = data.c4Grid;
+  if (data.turn!==undefined) { state.gameTurn=data.turn; updateGameTurnUI(); }
+  if (data.winner!==undefined) {
+    if (data.winner===0) showGameResult('🤝',"It's a Draw!",'Board is full!');
+    else if (data.winner!==state.myPlayerNum) showGameResult('😅','You Lost!','Opponent connected four!');
+    state.gameOver=true;
+  }
+  renderC4();
+}
+
+// ============================================================
+// CHESS (Basic)
+// ============================================================
+const whitePieces = new Set(['♙','♖','♘','♗','♕','♔']);
+const blackPieces = new Set(['♟','♜','♞','♝','♛','♚']);
+const CHESS_INIT = [
+  ['♜','♞','♝','♛','♚','♝','♞','♜'],
+  ['♟','♟','♟','♟','♟','♟','♟','♟'],
+  ['','','','','','','',''],['','','','','','','',''],
+  ['','','','','','','',''],['','','','','','','',''],
+  ['♙','♙','♙','♙','♙','♙','♙','♙'],
+  ['♖','♘','♗','♕','♔','♗','♘','♖'],
+];
+let chessBoard=[], chessSelected=null, chessMoves=[];
+
+function initChess(body) {
+  chessBoard = CHESS_INIT.map(r=>[...r]);
+  chessSelected = null; chessMoves = [];
+  const wrap = document.createElement('div');
+  wrap.className = 'chess-wrap';
+  wrap.innerHTML = `
+    <div class="chess-board" id="chess-board"></div>
+    <div id="chess-hint" style="text-align:center;font-size:11px;color:var(--text2);margin-top:8px">
+      ${state.myPlayerNum===1?'You are ♙ White — click a piece to select':'You are ♟ Black — click a piece to select'}
+    </div>`;
+  body.appendChild(wrap);
+  renderChess();
+}
+
+function renderChess() {
+  const board = document.getElementById('chess-board');
+  if (!board) return;
+  board.innerHTML = '';
+  for (let r=0;r<8;r++) for (let c=0;c<8;c++) {
+    const cell = document.createElement('div');
+    cell.className = 'ch-cell ' + ((r+c)%2===0?'light':'dark');
+    cell.textContent = chessBoard[r][c];
+    if (chessSelected && chessSelected[0]===r && chessSelected[1]===c) cell.classList.add('selected');
+    if (chessMoves.some(m=>m[0]===r&&m[1]===c)) cell.classList.add('valid-move');
+    if (state.gameOver || !canIPlay()) cell.classList.add('disabled');
+    else cell.onclick = () => chessClick(r,c);
+    board.appendChild(cell);
+  }
+}
+
+function chessClick(r,c) {
+  if (!canIPlay() || state.gameOver) return;
+  const mySet = state.myPlayerNum===1 ? whitePieces : blackPieces;
+  const oppSet = state.myPlayerNum===1 ? blackPieces : whitePieces;
+  const piece = chessBoard[r][c];
+
+  if (chessSelected && chessMoves.some(m=>m[0]===r&&m[1]===c)) {
+    const [fr,fc] = chessSelected;
+    const captured = chessBoard[r][c];
+    chessBoard[r][c] = chessBoard[fr][fc];
+    chessBoard[fr][fc] = '';
+    chessSelected=null; chessMoves=[];
+    const isKing = captured==='♔'||captured==='♚';
+    if (isKing) {
+      renderChess();
+      state.gameOver=true;
+      state.scores[`p${state.myPlayerNum}`]++;
+      updateScoreUI();
+      pushGameState({ chessBoard, winner: state.myPlayerNum });
+      setTimeout(()=>showGameResult('🏆','You Win!','Captured the king!'),400);
+      return;
+    }
+    pushGameState({ chessBoard, turn: state.gameTurn===1?2:1 });
+    switchGameTurn();
+    renderChess();
+    return;
+  }
+
+  if (piece && mySet.has(piece)) {
+    chessSelected=[r,c];
+    chessMoves = getChessMoves(r,c,piece,mySet,oppSet);
+    renderChess();
+    return;
+  }
+  chessSelected=null; chessMoves=[];
+  renderChess();
+}
+
+function getChessMoves(r,c,piece,own,opp) {
+  const moves=[];
+  const dir = state.myPlayerNum===1?-1:1;
+  const canLand=(nr,nc)=>nr>=0&&nr<8&&nc>=0&&nc<8&&!own.has(chessBoard[nr][nc]);
+  const slide=(dr,dc)=>{ let nr=r+dr,nc=c+dc; while(nr>=0&&nr<8&&nc>=0&&nc<8){ if(own.has(chessBoard[nr][nc]))break; moves.push([nr,nc]); if(opp.has(chessBoard[nr][nc]))break; nr+=dr;nc+=dc; }};
+  if(piece==='♙'||piece==='♟'){
+    if(chessBoard[r+dir]?.[c]===''){moves.push([r+dir,c]); const sr=state.myPlayerNum===1?6:1; if(r===sr&&chessBoard[r+2*dir]?.[c]==='')moves.push([r+2*dir,c]);}
+    [-1,1].forEach(dc=>{if(chessBoard[r+dir]?.[c+dc]&&opp.has(chessBoard[r+dir][c+dc]))moves.push([r+dir,c+dc]);});
+  } else if(piece==='♖'||piece==='♜'){[[1,0],[-1,0],[0,1],[0,-1]].forEach(([dr,dc])=>slide(dr,dc));}
+  else if(piece==='♘'||piece==='♞'){[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(([dr,dc])=>{if(canLand(r+dr,c+dc))moves.push([r+dr,c+dc]);});}
+  else if(piece==='♗'||piece==='♝'){[[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([dr,dc])=>slide(dr,dc));}
+  else if(piece==='♕'||piece==='♛'){[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([dr,dc])=>slide(dr,dc));}
+  else if(piece==='♔'||piece==='♚'){[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([dr,dc])=>{if(canLand(r+dr,c+dc))moves.push([r+dr,c+dc]);});}
+  return moves;
+}
+
+function syncChess(data) {
+  if(data.chessBoard) chessBoard=data.chessBoard;
+  if(data.turn!==undefined){state.gameTurn=data.turn;updateGameTurnUI();}
+  if(data.winner!==undefined){
+    if(data.winner!==state.myPlayerNum){showGameResult('😅','You Lost!','Your king was captured!');}
+    state.gameOver=true;
+  }
+  chessSelected=null;chessMoves=[];
+  renderChess();
+}
+
+// ============================================================
+// MEMORY MATCH
+// ============================================================
+const MEM_EMOJIS=['🎮','🎬','🎵','🎲','🏆','⭐','🔥','💎'];
+let memCards=[], memFlipped=[], memMatched=[], memLock=false;
+
+function initMemory(body) {
+  const pairs=[...MEM_EMOJIS,...MEM_EMOJIS];
+  memCards=pairs.sort(()=>Math.random()-0.5);
+  memFlipped=[]; memMatched=[]; memLock=false;
+  const wrap=document.createElement('div');
+  wrap.className='mem-grid';
+  wrap.id='mem-grid';
+  body.appendChild(wrap);
+  renderMemory();
+}
+
+function renderMemory() {
+  const grid=document.getElementById('mem-grid');
+  if(!grid) return;
+  grid.innerHTML='';
+  memCards.forEach((card,i)=>{
+    const div=document.createElement('div');
+    div.className='mem-card';
+    const show=memFlipped.includes(i)||memMatched.includes(i);
+    if(show)div.classList.add('flip');
+    if(memMatched.includes(i))div.classList.add('matched');
+    if(!canIPlay()||memLock||memMatched.includes(i))div.classList.add('disabled');
+    div.textContent=show?card:'❓';
+    div.onclick=()=>memClick(i);
+    grid.appendChild(div);
+  });
+}
+
+function memClick(i) {
+  if(!canIPlay()||memLock||memFlipped.includes(i)||memMatched.includes(i)||state.gameOver)return;
+  memFlipped.push(i);
+  renderMemory();
+  if(memFlipped.length===2){
+    memLock=true;
+    const[a,b]=memFlipped;
+    if(memCards[a]===memCards[b]){
+      memMatched.push(a,b);
+      memFlipped=[];
+      memLock=false;
+      state.scores[`p${state.myPlayerNum}`]++;
+      updateScoreUI();
+      pushGameState({memCards,memMatched,memFlipped,turn:state.gameTurn});
+      if(memMatched.length===memCards.length){
+        state.gameOver=true;
+        const myScore=state.scores[`p${state.myPlayerNum}`];
+        const oppScore=state.scores[`p${state.myPlayerNum===1?2:1}`];
+        showGameResult(myScore>=oppScore?'🏆':'😅',myScore>=oppScore?'You Win!':'You Lost!',`Score: ${myScore} - ${oppScore}`);
+      }
+    } else {
+      setTimeout(()=>{memFlipped=[];memLock=false;switchGameTurn();pushGameState({memCards,memMatched,memFlipped,turn:state.gameTurn});renderMemory();},900);
+    }
+  } else if(memFlipped.length===1){
+    pushGameState({memCards,memMatched,memFlipped,turn:state.gameTurn});
+  }
+}
+
+function syncMemory(data) {
+  if(data.memCards)memCards=data.memCards;
+  if(data.memMatched)memMatched=data.memMatched;
+  if(data.memFlipped)memFlipped=data.memFlipped;
+  if(data.turn!==undefined){state.gameTurn=data.turn;updateGameTurnUI();}
+  renderMemory();
+}
+
+// ============================================================
+// RPS
+// ============================================================
+let rpsMyChoice=null, rpsOppChoice=null;
+
+function initRPS(body) {
+  rpsMyChoice=null; rpsOppChoice=null;
+  body.innerHTML=`
+    <div class="card-game-wrap">
+      <div style="font-size:14px;font-weight:700;margin-bottom:8px;color:var(--text2)">Pick your move:</div>
+      <div class="rps-choices">
+        <button class="rps-btn" onclick="rpsChoose('✊')" title="Rock">✊</button>
+        <button class="rps-btn" onclick="rpsChoose('✋')" title="Paper">✋</button>
+        <button class="rps-btn" onclick="rpsChoose('✌️')" title="Scissors">✌️</button>
+      </div>
+      <div class="rps-result" id="rps-result">Choose your weapon!</div>
+      <div style="text-align:center;font-size:12px;color:var(--text2)" id="rps-scores">Wins — You: 0 | Opp: 0</div>
+    </div>`;
+}
+
+function rpsChoose(choice) {
+  if(rpsMyChoice||state.gameOver) return;
+  rpsMyChoice=choice;
+  document.getElementById('rps-result').textContent=`You chose ${choice} — Waiting for opponent...`;
+  pushGameState({ rpsChoice: choice, player: state.myPlayerNum });
+}
+
+function syncRPS(data) {
+  if(data.player===state.myPlayerNum) return;
+  rpsOppChoice=data.rpsChoice;
+  if(rpsMyChoice&&rpsOppChoice) {
+    const r=rpsResult(rpsMyChoice,rpsOppChoice);
+    document.getElementById('rps-result').textContent=
+      `You: ${rpsMyChoice} vs Opp: ${rpsOppChoice} — ${r}`;
+    if(r.includes('Win'))state.scores[`p${state.myPlayerNum}`]++;
+    else if(r.includes('Lost'))state.scores[`p${state.myPlayerNum===1?2:1}`]++;
+    updateScoreUI();
+    document.getElementById('rps-scores').textContent=
+      `Wins — You: ${state.scores.p1} | Opp: ${state.scores.p2}`;
+    setTimeout(()=>{rpsMyChoice=null;rpsOppChoice=null;
+      document.getElementById('rps-result').textContent='Choose your weapon!';},2000);
+  }
+}
+
+function rpsResult(a,b) {
+  if(a===b)return"It's a Tie!";
+  if((a==='✊'&&b==='✌️')||(a==='✋'&&b==='✊')||(a==='✌️'&&b==='✋'))return'🏆 You Win!';
+  return'😅 You Lost!';
+}
+
+// ============================================================
+// SNAKE & LADDER
+// ============================================================
+const SNAKES={16:6,47:26,49:11,56:53,62:19,64:60,87:24,93:73,95:75,99:78};
+const LADDERS={4:14,9:31,20:38,28:84,40:59,51:67,63:81,71:91};
+let slPos=[0,0];
+
+function initSL(body) {
+  slPos=[0,0];
+  const wrap=document.createElement('div');
+  wrap.className='sl-wrap';
+  wrap.innerHTML=`<div class="sl-board" id="sl-board"></div>
+  <div class="dice-row">
+    <div class="dice-face" id="sl-dice">🎲</div>
+    <button class="roll-btn" id="sl-roll" onclick="rollSL()">Roll Dice</button>
+  </div>`;
+  body.appendChild(wrap);
+  renderSL();
+}
+
+function renderSL() {
+  const board=document.getElementById('sl-board');
+  if(!board)return;
+  board.innerHTML='';
+  for(let row=9;row>=0;row--){
+    const even=(9-row)%2===0;
+    for(let col=0;col<10;col++){
+      const ac=even?col:(9-col);
+      const num=row*10+ac+1;
+      const cell=document.createElement('div');
+      cell.className='sl-cell';
+      if(SNAKES[num])cell.classList.add('snake');
+      else if(LADDERS[num])cell.classList.add('ladder');
+      const numEl=document.createElement('span');
+      numEl.textContent=num;
+      cell.appendChild(numEl);
+      [0,1].forEach((p,pi)=>{
+        if(slPos[p]===num){
+          const tok=document.createElement('div');
+          tok.className='sl-token';
+          tok.style.background=p===0?'#ef4444':'#3b82f6';
+          tok.style.left=pi===0?'2px':'48%';
+          tok.textContent=p===0?'P1':'P2';
+          cell.appendChild(tok);
+        }
+      });
+      board.appendChild(cell);
+    }
+  }
+  const rollBtn=document.getElementById('sl-roll');
+  if(rollBtn)rollBtn.disabled=!canIPlay();
+}
+
+function rollSL() {
+  if(!canIPlay()||state.gameOver)return;
+  const val=Math.floor(Math.random()*6)+1;
+  const faces=['','1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣'];
+  document.getElementById('sl-dice').textContent=faces[val];
+  const pi=state.myPlayerNum-1;
+  let newPos=slPos[pi]+val;
+  if(newPos>100){showToast('Need exact roll!');return;}
+  let msg=`Moved to ${newPos}`;
+  if(SNAKES[newPos]){newPos=SNAKES[newPos];msg=`🐍 Snake! → ${newPos}`;}
+  else if(LADDERS[newPos]){newPos=LADDERS[newPos];msg=`🪜 Ladder! → ${newPos}`;}
+  slPos[pi]=newPos;
+  showToast(msg);
+  renderSL();
+  pushGameState({slPos, turn: state.gameTurn===1?2:1});
+  if(newPos>=100){state.gameOver=true;state.scores[`p${state.myPlayerNum}`]++;updateScoreUI();setTimeout(()=>showGameResult('🏆','You Win!','Reached 100 first!'),300);return;}
+  switchGameTurn();
+}
+
+// ============================================================
+// LUDO (Simplified Visual)
+// ============================================================
+function initLudo(body) {
+  body.innerHTML=`
+    <div class="ludo-wrap">
+      <div class="ludo-area">
+        <div class="ludo-zone red">
+          <div class="ludo-token-slot red-t">R1</div>
+          <div class="ludo-token-slot red-t">R2</div>
+          <div class="ludo-token-slot red-t">R3</div>
+          <div class="ludo-token-slot red-t">R4</div>
+        </div>
+        <div class="ludo-zone blue">
+          <div class="ludo-token-slot blue-t">B1</div>
+          <div class="ludo-token-slot blue-t">B2</div>
+          <div class="ludo-token-slot blue-t">B3</div>
+          <div class="ludo-token-slot blue-t">B4</div>
+        </div>
+        <div class="ludo-zone green">
+          <div class="ludo-token-slot green-t">G1</div>
+          <div class="ludo-token-slot green-t">G2</div>
+          <div class="ludo-token-slot green-t">G3</div>
+          <div class="ludo-token-slot green-t">G4</div>
+        </div>
+        <div class="ludo-zone yellow">
+          <div class="ludo-token-slot yellow-t">Y1</div>
+          <div class="ludo-token-slot yellow-t">Y2</div>
+          <div class="ludo-token-slot yellow-t">Y3</div>
+          <div class="ludo-token-slot yellow-t">Y4</div>
+        </div>
+      </div>
+      <div class="dice-row">
+        <div class="dice-face" id="ludo-dice">🎲</div>
+        <button class="roll-btn" id="ludo-roll" onclick="rollLudo()">Roll Dice</button>
+      </div>
+      <div style="text-align:center;font-size:12px;color:var(--text2);margin-top:8px">
+        ${state.myPlayerNum===1?'You are 🔴 Red':'You are 🔵 Blue'}
+      </div>
+    </div>`;
+}
+
+function rollLudo() {
+  if(!canIPlay()||state.gameOver)return;
+  const val=Math.floor(Math.random()*6)+1;
+  const faces=['','1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣'];
+  document.getElementById('ludo-dice').textContent=faces[val];
+  showToast(`Rolled ${val}! ${val===6?'You get another turn!':''}`);
+  if(val!==6){switchGameTurn();pushGameState({ludoRoll:val,turn:state.gameTurn});}
+  else{showToast('Rolled 6! 🎉 Roll again or move a token out');}
+}
+
+// ============================================================
+// DICE BATTLE
+// ============================================================
+function initDice(body) {
+  body.innerHTML=`
+    <div class="card-game-wrap">
+      <div style="display:flex;gap:20px;justify-content:center;align-items:center;margin:20px 0">
+        <div style="text-align:center">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:6px">YOU</div>
+          <div class="dice-face" id="dice-you" style="width:64px;height:64px;font-size:36px">🎲</div>
+        </div>
+        <div style="font-size:24px;font-weight:800;color:var(--text3)">VS</div>
+        <div style="text-align:center">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:6px">OPP</div>
+          <div class="dice-face" id="dice-opp" style="width:64px;height:64px;font-size:36px">🎲</div>
+        </div>
+      </div>
+      <div style="text-align:center;font-size:18px;font-weight:800;margin:12px 0;color:#a78bfa" id="dice-result">Roll to battle!</div>
+      <div style="display:flex;justify-content:center">
+        <button class="roll-btn" onclick="rollDiceBattle()" id="dice-roll-btn">🎲 Roll!</button>
+      </div>
+    </div>`;
+}
+
+let myDiceRoll=null;
+function rollDiceBattle() {
+  if(!canIPlay()||state.gameOver)return;
+  const val=Math.floor(Math.random()*6)+1;
+  const faces=['','1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣'];
+  myDiceRoll=val;
+  document.getElementById('dice-you').textContent=faces[val];
+  document.getElementById('dice-result').textContent='Waiting for opponent...';
+  document.getElementById('dice-roll-btn').disabled=true;
+  pushGameState({diceRoll:val,player:state.myPlayerNum,turn:state.gameTurn===1?2:1});
+  switchGameTurn();
+}
+
+// ============================================================
+// NUMBER GUESS
+// ============================================================
+let ngSecret=null, ngAttempts=0;
+function initNG(body) {
+  ngSecret=Math.floor(Math.random()*100)+1;
+  ngAttempts=0;
+  body.innerHTML=`
+    <div class="ng-wrap">
+      <div style="font-size:14px;color:var(--text2);margin-bottom:8px">Guess a number between 1 and 100</div>
+      <div class="ng-hint" id="ng-hint">🤔 ?</div>
+      <input class="ng-input" id="ng-input" type="number" min="1" max="100" placeholder="?" autocomplete="off">
+      <div style="display:flex;justify-content:center">
+        <button class="roll-btn" onclick="guessNG()">Guess!</button>
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin-top:12px" id="ng-attempts">Attempts: 0</div>
+    </div>`;
+  pushGameState({ngSecret});
+}
+
+function guessNG() {
+  const val=parseInt(document.getElementById('ng-input').value);
+  if(!val||val<1||val>100){showToast('Enter 1-100');return;}
+  ngAttempts++;
+  document.getElementById('ng-attempts').textContent=`Attempts: ${ngAttempts}`;
+  const hint=document.getElementById('ng-hint');
+  if(val===ngSecret){
+    hint.textContent='🎯 Correct!';
+    state.scores[`p${state.myPlayerNum}`]++;
+    updateScoreUI();
+    pushGameState({ngGuess:val,ngAttempts,winner:state.myPlayerNum});
+    state.gameOver=true;
+    setTimeout(()=>showGameResult('🏆','You Win!',`Found it in ${ngAttempts} attempts!`),400);
+  } else {
+    hint.textContent=val<ngSecret?'📈 Too Low!':'📉 Too High!';
+    pushGameState({ngGuess:val,ngHint:val<ngSecret?'low':'high',turn:state.gameTurn===1?2:1});
+    switchGameTurn();
+  }
+  document.getElementById('ng-input').value='';
+}
+
+function syncNG(data) {
+  if(data.ngSecret&&!ngSecret)ngSecret=data.ngSecret;
+  if(data.turn!==undefined){state.gameTurn=data.turn;updateGameTurnUI();}
+  if(data.ngHint){
+    const hint=document.getElementById('ng-hint');
+    if(hint)hint.textContent=data.ngHint==='low'?'📈 Opp guessed too low':'📉 Opp guessed too high';
+  }
+  if(data.winner&&data.winner!==state.myPlayerNum){
+    state.gameOver=true;
+    showGameResult('😅','You Lost!',`Opponent found it in ${data.ngAttempts} attempts!`);
+  }
+}
+
+// ============================================================
+// TRUTH OR DARE
+// ============================================================
+const TRUTHS=['What is your most embarrassing memory?','What is the biggest lie you ever told?','Who is your secret crush?','What is your worst habit?','Have you ever cheated on a test?','What are you most afraid of?','What is the most childish thing you still do?','What is something you have never told anyone?'];
+const DARES=['Do your best dance move for 30 seconds','Text someone a random compliment right now','Talk in a funny accent for the next 2 minutes','Do 15 pushups right now','Sing the chorus of your favorite song','Call someone and say "I have a confession" then hang up','Speak only in whispers for the next 5 minutes','Do your best impression of a celebrity'];
+
+function initTOD(body) {
+  body.innerHTML=`
+    <div class="card-game-wrap">
+      <div class="card-btns">
+        <button class="card-btn primary" onclick="drawTOD('truth')">💬 Truth</button>
+        <button class="card-btn primary" onclick="drawTOD('dare')" style="background:linear-gradient(135deg,#ef4444,#dc2626)">🔥 Dare</button>
+      </div>
+      <div class="question-card" id="tod-card">
+        <div class="question-text" id="tod-text">Tap Truth or Dare to reveal your challenge!</div>
+      </div>
+      <button class="card-btn" onclick="drawTOD(lastTOD||'truth')" style="margin-top:8px">🔄 Next Card</button>
+    </div>`;
+}
+let lastTOD='truth';
+function drawTOD(type) {
+  lastTOD=type;
+  const list=type==='truth'?TRUTHS:DARES;
+  const q=list[Math.floor(Math.random()*list.length)];
+  document.getElementById('tod-text').textContent=q;
+}
+
+// ============================================================
+// WOULD YOU RATHER
+// ============================================================
+const WYR=[
+  ['Have the ability to fly','Have the ability to be invisible'],
+  ['Always be 10 minutes late','Always be 20 minutes early'],
+  ['Live without music','Live without movies/TV'],
+  ['Be famous but hated','Be unknown but loved'],
+  ['Have unlimited money','Have unlimited time'],
+  ['Know when you will die','Know how you will die'],
+  ['Be able to speak every language','Be able to play every instrument'],
+  ['Have super strength','Have super speed'],
+];
+
+function initWYR(body) {
+  body.innerHTML=`
+    <div class="card-game-wrap">
+      <div class="question-card" id="wyr-card" style="flex-direction:column;gap:14px">
+        <div class="question-text" id="wyr-a" style="padding:10px;background:rgba(124,58,237,0.1);border-radius:10px;width:100%;cursor:pointer" onclick="voteWYR(0)">---</div>
+        <div style="font-size:12px;font-weight:700;color:var(--text3)">OR</div>
+        <div class="question-text" id="wyr-b" style="padding:10px;background:rgba(6,182,212,0.1);border-radius:10px;width:100%;cursor:pointer" onclick="voteWYR(1)">---</div>
+      </div>
+      <div id="wyr-votes" style="text-align:center;font-size:12px;color:var(--text2)"></div>
+      <button class="card-btn mt12" onclick="nextWYR()">🔄 Next Question</button>
+    </div>`;
+  nextWYR();
+}
+
+let wyrVotes=[0,0], wyrIdx=0;
+function nextWYR() {
+  wyrIdx=Math.floor(Math.random()*WYR.length);
+  wyrVotes=[0,0];
+  document.getElementById('wyr-a').textContent='Would you rather... '+WYR[wyrIdx][0];
+  document.getElementById('wyr-b').textContent='...or... '+WYR[wyrIdx][1];
+  document.getElementById('wyr-votes').textContent='Tap to vote!';
+}
+function voteWYR(choice) {
+  wyrVotes[choice]++;
+  const total=wyrVotes[0]+wyrVotes[1];
+  document.getElementById('wyr-votes').textContent=
+    `${WYR[wyrIdx][0]}: ${Math.round(wyrVotes[0]/total*100)}% | ${WYR[wyrIdx][1]}: ${Math.round(wyrVotes[1]/total*100)}%`;
+}
+
+// ============================================================
+// QUIZ DUEL
+// ============================================================
+const QUIZ_QS=[
+  {q:'What is the capital of France?',a:['Paris','London','Berlin','Rome'],c:0},
+  {q:'What planet is closest to the sun?',a:['Venus','Earth','Mercury','Mars'],c:2},
+  {q:'How many sides does a hexagon have?',a:['5','6','7','8'],c:1},
+  {q:'What is 12 × 12?',a:['134','144','124','154'],c:1},
+  {q:'Who painted the Mona Lisa?',a:['Picasso','da Vinci','Rembrandt','Monet'],c:1},
+  {q:'What is the largest ocean?',a:['Atlantic','Indian','Arctic','Pacific'],c:3},
+];
+let quizIdx=0, quizScore=0;
+
+function initQuiz(body) {
+  quizIdx=0; quizScore=0;
+  body.innerHTML=`<div class="card-game-wrap" id="quiz-wrap"></div>`;
+  renderQuiz();
+}
+
+function renderQuiz() {
+  if(quizIdx>=QUIZ_QS.length){
+    document.getElementById('quiz-wrap').innerHTML=`
+      <div style="text-align:center">
+        <div style="font-size:48px;margin-bottom:12px">🏆</div>
+        <div style="font-size:20px;font-weight:800">Quiz Complete!</div>
+        <div style="font-size:14px;color:var(--text2);margin-top:8px">You scored ${quizScore}/${QUIZ_QS.length}</div>
+        <button class="roll-btn" onclick="initQuiz(document.getElementById('game-body'))" style="margin-top:16px">Play Again</button>
+      </div>`;
+    state.scores[`p${state.myPlayerNum}`]=quizScore;
+    updateScoreUI();
+    return;
+  }
+  const q=QUIZ_QS[quizIdx];
+  document.getElementById('quiz-wrap').innerHTML=`
+    <div style="font-size:11px;color:var(--text2);margin-bottom:8px">Question ${quizIdx+1}/${QUIZ_QS.length}</div>
+    <div class="question-card"><div class="question-text">${q.q}</div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
+      ${q.a.map((opt,i)=>`<button class="card-btn" onclick="answerQuiz(${i})" style="text-align:left;font-size:12px">${opt}</button>`).join('')}
+    </div>
+    <div style="font-size:12px;color:var(--text2);margin-top:10px">Score: ${quizScore}</div>`;
+}
+
+function answerQuiz(choice) {
+  const q=QUIZ_QS[quizIdx];
+  const btns=document.querySelectorAll('#quiz-wrap .card-btn');
+  btns.forEach((b,i)=>{
+    b.disabled=true;
+    if(i===q.c)b.style.background='rgba(16,185,129,0.3)';
+    else if(i===choice&&choice!==q.c)b.style.background='rgba(239,68,68,0.3)';
+  });
+  if(choice===q.c){quizScore++;showToast('✅ Correct!');}
+  else showToast('❌ Wrong!');
+  setTimeout(()=>{quizIdx++;renderQuiz();},1000);
+}
+
+// ============================================================
+// 20 QUESTIONS
+// ============================================================
+function init20Q(body) {
+  body.innerHTML=`
+    <div class="card-game-wrap">
+      <div style="font-size:14px;font-weight:700;margin-bottom:8px">20 Questions</div>
+      <div class="question-card">
+        <div class="question-text">One player thinks of something. Others ask yes/no questions to guess it within 20 questions!</div>
+      </div>
+      <div style="text-align:center;font-size:36px;font-weight:900;margin:16px 0" id="q20-count">20</div>
+      <div class="card-btns">
+        <button class="card-btn primary" onclick="q20Answer('✅ YES')">✅ Yes</button>
+        <button class="card-btn primary" onclick="q20Answer('❌ NO')" style="background:linear-gradient(135deg,#ef4444,#dc2626)">❌ No</button>
+        <button class="card-btn" onclick="q20Next()">❓ Next Q</button>
+      </div>
+      <div id="q20-answer" style="text-align:center;font-size:24px;font-weight:800;margin-top:12px"></div>
+    </div>`;
+}
+let q20Remaining=20;
+function q20Answer(a){document.getElementById('q20-answer').textContent=a;setTimeout(()=>{document.getElementById('q20-answer').textContent='';},1500);}
+function q20Next(){if(q20Remaining>0){q20Remaining--;document.getElementById('q20-count').textContent=q20Remaining;}}
+
+// ============================================================
+// COMPAT QUIZ
+// ============================================================
+const COMPAT_QS=[
+  {q:'Ideal date?',a:['Home movie night','Adventure outside','Fine dining','Spontaneous road trip']},
+  {q:'Love language?',a:['Words of affirmation','Acts of service','Gifts','Quality time']},
+  {q:'Morning or night?',a:['Early bird','Night owl','Whenever','Depends on the day']},
+  {q:'Dream vacation?',a:['Beach resort','Mountain cabin','City exploration','World travel']},
+];
+let compatAnswers=[];
+function initCompat(body) {
+  compatAnswers=[];
+  body.innerHTML=`<div class="card-game-wrap" id="compat-wrap"></div>`;
+  renderCompat(0);
+}
+function renderCompat(qi) {
+  if(qi>=COMPAT_QS.length){
+    document.getElementById('compat-wrap').innerHTML=`
+      <div style="text-align:center;padding:20px">
+        <div style="font-size:48px;margin-bottom:12px">💕</div>
+        <div style="font-size:20px;font-weight:800">Compatibility Result!</div>
+        <div style="font-size:36px;font-weight:900;color:#f472b6;margin:16px 0">${Math.floor(70+Math.random()*30)}%</div>
+        <div style="font-size:13px;color:var(--text2)">You two are highly compatible!</div>
+        <button class="roll-btn" onclick="initCompat(document.getElementById('game-body'))" style="margin-top:16px">Try Again</button>
+      </div>`;
+    return;
+  }
+  const q=COMPAT_QS[qi];
+  document.getElementById('compat-wrap').innerHTML=`
+    <div style="font-size:11px;color:var(--text2);margin-bottom:8px">Question ${qi+1}/${COMPAT_QS.length}</div>
+    <div class="question-card"><div class="question-text">${q.q}</div></div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+      ${q.a.map((opt,i)=>`<button class="card-btn" onclick="compatAnswer(${qi},${i})" style="text-align:left;font-size:13px">💕 ${opt}</button>`).join('')}
+    </div>`;
+}
+function compatAnswer(qi,ai){compatAnswers.push(ai);renderCompat(qi+1);}
+
+// ============================================================
+// COUPLES DARE
+// ============================================================
+const COUPLE_DARES=['Send each other your favorite song right now','Tell one thing you appreciate about the other person','Plan your next date night together','Share a memory that makes you both smile','Describe the other person in 3 words','Tell each other something you have never said before'];
+function initDare2(body) {
+  body.innerHTML=`
+    <div class="card-game-wrap">
+      <div class="question-card" id="dare2-card">
+        <div class="question-text">Tap the button for a couples dare! 💌</div>
+      </div>
+      <button class="card-btn primary" onclick="drawDare2()" style="margin-top:12px">💌 Draw Dare</button>
+    </div>`;
+}
+function drawDare2(){document.getElementById('dare2-card').querySelector('.question-text').textContent=COUPLE_DARES[Math.floor(Math.random()*COUPLE_DARES.length)];}
+
+// ============================================================
+// CHECKERS (Basic)
+// ============================================================
+function initCheckers(body) {
+  body.innerHTML=`<div style="text-align:center;padding:24px;color:var(--text2)">
+    <div style="font-size:48px;margin-bottom:12px">🔵</div>
+    <div style="font-size:16px;font-weight:700">Checkers</div>
+    <div style="font-size:12px;margin-top:8px">Full checkers coming in the next update!</div>
+    <button class="roll-btn" onclick="exitGame()" style="margin-top:16px">Back to Games</button>
+  </div>`;
+}
+
+// ============================================================
+// SCORE UI
+// ============================================================
+function updateScoreUI() {
+  document.getElementById('score-p1').textContent=`${state.userName||'You'}: ${state.scores.p1}`;
+  document.getElementById('score-p2').textContent=`Opp: ${state.scores.p2}`;
+}
+
+// ============================================================
+// SETTINGS
+// ============================================================
+function openSettings() {
+  document.getElementById('settings-panel').classList.add('open');
+}
+function closeSettings() {
+  document.getElementById('settings-panel').classList.remove('open');
+}
+
+function toggleSetting(key) {
+  const el=document.getElementById(`toggle-${key}`);
+  el.classList.toggle('on');
+  state.settings[key]=el.classList.contains('on');
+  localStorage.setItem('cs_settings',JSON.stringify(state.settings));
+  if(key==='motion'){
+    document.getElementById('bg').style.display=state.settings.motion?'none':'block';
+  }
+}
+
+function setAccent(color, glow, el) {
+  document.documentElement.style.setProperty('--accent', color);
+  document.documentElement.style.setProperty('--accent-glow', glow);
+  document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active'));
+  el.classList.add('active');
+  state.settings.accent=color;
+  state.settings.accentGlow=glow;
+  localStorage.setItem('cs_settings',JSON.stringify(state.settings));
+}
+
+// Load saved settings
+(function loadSettings(){
+  const s=state.settings;
+  if(s.accent) document.documentElement.style.setProperty('--accent',s.accent);
+  if(s.accentGlow) document.documentElement.style.setProperty('--accent-glow',s.accentGlow);
+  if(s.motion) document.getElementById('bg').style.display='none';
+  ['sound','notif','motion','compact'].forEach(k=>{
+    const el=document.getElementById(`toggle-${k}`);
+    if(el&&s[k]===true)el.classList.add('on');
+    if(el&&s[k]===false)el.classList.remove('on');
+  });
+})();
+
+// Close settings on outside tap
+document.getElementById('settings-panel').addEventListener('click',function(e){
+  if(e.target===this)closeSettings();
+});
+
+// Close modals on outside tap
+document.querySelectorAll('.modal-overlay').forEach(m=>{
+  m.addEventListener('click',function(e){if(e.target===this)this.classList.remove('active');});
+});
+</script>
+</body>
+</html>
